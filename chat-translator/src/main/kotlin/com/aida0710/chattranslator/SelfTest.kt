@@ -64,6 +64,8 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "dump" -> mc.gui.hud.chat.allMessages.take(args.getOrNull(1)?.toInt() ?: 10).reversed()
                 .forEach { log("chat| ${it.content().string}") }
             "swap" -> log("swap=${chat.swap(args[1].toInt())}")
+            // [原文] ボタンをクリックしたときと同じ経路 (ClickEvent.RunCommand → クライアントコマンド) で実行する
+            "click" -> mc.player!!.connection.sendUnattendedCommand("chattranslator swap ${args[1]}", null)
             "tooltip" -> {
                 val stack = ItemStack(Items.DIAMOND_SWORD).apply {
                     set(DataComponents.CUSTOM_NAME, Component.literal("§6Aspect of the Dragons"))

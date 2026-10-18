@@ -29,7 +29,15 @@ class Translator(
         ThreadPoolExecutor.AbortPolicy(),
     )
 
-    private fun key(text: String) = TranslatorConfig.current.modelKey + "\u0000" + text
+    /**
+     * キャッシュキー。アイテム名保護の有無で訳文が変わるため区別する
+     * (アイテム一覧の読み込み前に保護なしで訳した結果が、保護ありの訳を隠さないように)
+     */
+    private fun key(text: String): String {
+        val cfg = TranslatorConfig.current
+        val tag = if (cfg.protectItemNames && itemNames.size > 0) "|items" else ""
+        return cfg.modelKey + tag + "\u0000" + text
+    }
 
     /** 辞書またはキャッシュにあれば即座に返す。無ければ null。 */
     fun cached(text: String): String? = glossary.lookup(text) ?: cache.get(key(text))

@@ -184,15 +184,36 @@ class LlamaServerManager(
         findServer(dir)?.let { return it }
 
         val assets = assetNames(cfg.llamaBuild, cfg.gpuBackend)
+        val digests = releaseDigests(cfg.llamaBuild)
         for (asset in assets) {
             val archive = baseDir.resolve("downloads").resolve(asset)
             val url = "https://github.com/ggml-org/llama.cpp/releases/download/${cfg.llamaBuild}/$asset"
+            // 実行ファイルなので、GitHub が公開している SHA-256 と一致しない限り使わない
+            val sha256 = digests[asset] ?: throw IllegalStateException("$asset の SHA-256 を GitHub から取得できないため中止しました")
             notify("llama.cpp ($asset) をダウンロードしています…", false)
-            Downloader.download(url, archive, null) { done, total -> progress(asset, done, total) }
+            Downloader.download(url, archive, sha256) { done, total -> progress(asset, done, total) }
             Downloader.extract(archive, dir)
             Files.deleteIfExists(archive)
         }
         return findServer(dir) ?: throw IllegalStateException("llama-server not found in ${assets.first()}")
+    }
+
+    /** GitHub Releases API からアセット名 → SHA-256 を取得する */
+    private fun releaseDigests(build: String): Map<String, String> {
+        val res = http.send(
+            HttpRequest.newBuilder(URI.create("https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/$build"))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "ChatTranslator-Minecraft-Mod")
+                .timeout(Duration.ofSeconds(20)).GET().build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        check(res.statusCode() == 200) { "GitHub API HTTP ${res.statusCode()}" }
+        return com.google.gson.JsonParser.parseString(res.body()).asJsonObject.getAsJsonArray("assets").mapNotNull { a ->
+            val o = a.asJsonObject
+            val digest = o["digest"]?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            if (!digest.startsWith("sha256:")) return@mapNotNull null
+            o["name"].asString to digest.removePrefix("sha256:")
+        }.toMap()
     }
 
     private fun findServer(dir: Path): Path? {
