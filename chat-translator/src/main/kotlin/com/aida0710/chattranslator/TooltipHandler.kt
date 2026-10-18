@@ -22,7 +22,8 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
         var i = 0
         while (i < lines.size) {
             val line = lines[i]
-            if (i == 0 && !cfg.tooltipTranslateItemName) { i++; continue }
+            // アイテム名は固有名詞なので、既知の SkyBlock アイテムなら英語のまま
+            if (i == 0 && (!cfg.tooltipTranslateItemName || (cfg.protectItemNames && translator.itemNames.isItemName(TextUtil.stripFormatting(line.string))))) { i++; continue }
             val text = TextUtil.stripFormatting(line.string).trim()
             if (!TextUtil.looksTranslatable(text, cfg.minLength) || identifier.matches(text) || translator.isSkipped(text)) {
                 i++; continue
@@ -44,8 +45,10 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
     private fun styled(original: Component, translated: String): Component {
         // サーバーが § コード入りのリテラルを送ってくる場合は先頭のコードを引き継ぐ
         val codes = leadingCodes.find(original.string)?.value
-        return if (codes != null) Component.literal(codes + translated)
-        else Component.literal(translated).withStyle(firstStyle(original))
+        // 字下げ (行頭の空白) は残す
+        val indent = TextUtil.stripFormatting(original.string).takeWhile { it == ' ' }
+        return if (codes != null) Component.literal(codes + indent + translated)
+        else Component.literal(indent + translated).withStyle(firstStyle(original))
     }
 
     /** 行内で最初に文字を持つセグメントのスタイル (色・太字など) を訳文全体に引き継ぐ */

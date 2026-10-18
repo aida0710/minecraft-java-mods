@@ -14,6 +14,7 @@ class Translator(
     private val client: LlmClient,
     private val cache: TranslationCache,
     private val glossary: Glossary,
+    val itemNames: ItemNames,
 ) {
     private val pending: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val failed = ConcurrentHashMap<String, Long>()
@@ -28,7 +29,7 @@ class Translator(
         ThreadPoolExecutor.AbortPolicy(),
     )
 
-    private fun key(text: String) = TranslatorConfig.current.model + "\u0000" + text
+    private fun key(text: String) = TranslatorConfig.current.modelKey + "\u0000" + text
 
     /** 辞書またはキャッシュにあれば即座に返す。無ければ null。 */
     fun cached(text: String): String? = glossary.lookup(text) ?: cache.get(key(text))
@@ -38,6 +39,8 @@ class Translator(
     /** チャット用: 完了時にコールバックを (キャッシュヒット時は呼び出し元、それ以外は翻訳スレッドから) 呼ぶ */
     fun translateChat(text: String, onSuccess: (String) -> Unit, onFailure: () -> Unit) {
         cached(text)?.let { onSuccess(it); return }
+        // 内蔵サーバーの起動待ち中は翻訳しない (原文のまま)
+        if (!client.isReady()) { onFailure(); return }
         try {
             chatExecutor.execute {
                 runCatching { translateNow(text) }
@@ -59,6 +62,7 @@ class Translator(
      */
     fun translateTooltipLine(text: String): String? {
         cached(text)?.let { return it }
+        if (!client.isReady()) return null
         val k = key(text)
         val failedAt = failed[k]
         if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return null
@@ -86,10 +90,22 @@ class Translator(
 
     private fun translateNow(text: String): String {
         cached(text)?.let { return it }
-        val result = client.translate(text)
+        val result = translateProtected(text)
         if (result.isBlank()) throw IllegalStateException("empty translation")
         cache.put(key(text), result)
         return result
+    }
+
+    /** 既知のアイテム名を ITEMn に置き換えて訳し、元に戻す。プレースホルダーが崩れたら通常の翻訳にする */
+    private fun translateProtected(text: String): String {
+        if (!TranslatorConfig.current.protectItemNames) return client.translate(text)
+        val p = itemNames.protect(text)
+        if (p.names.isEmpty()) return client.translate(text)
+        // アイテム名だけの文 (記号のみ残る) は訳さない
+        if (p.text.replace(PLACEHOLDER, "").none { it.isLetter() }) return text
+        itemNames.restore(client.translate(p.text), p.names)?.let { return it }
+        ChatTranslator.LOGGER.debug("Placeholder lost; retrying without item protection: {}", text)
+        return client.translate(text)
     }
 
     fun clearCache() {
@@ -105,5 +121,6 @@ class Translator(
 
     private companion object {
         const val RETRY_AFTER_MS = 30_000L
+        val PLACEHOLDER = Regex("ITEM\\d+")
     }
 }

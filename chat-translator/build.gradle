@@ -23,7 +23,11 @@ minecraft {
             workingDir = layout.projectDirectory.dir('run')
             systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
         }
-        register('client')
+        register('client') {
+            // ./gradlew runClient -Pselftest=<dir> -Pjoin=localhost:25565 で自動テスト用に起動する
+            if (project.hasProperty('selftest')) systemProperty 'chattranslator.selftest', project.property('selftest')
+            if (project.hasProperty('join')) args '--quickPlayMultiplayer', project.property('join')
+        }
     }
 }
 

@@ -48,7 +48,7 @@ class Glossary(private val file: Path) {
                 "Right-click to view recipes!": "右クリックでレシピ表示！"
               },
               "skip": [
-                "^\\s*(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC|DIVINE|SPECIAL|VERY SPECIAL)\\b.*$",
+                "^\\s*(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC|DIVINE|SPECIAL|VERY SPECIAL)( [A-Z ]+)?$",
                 "^\\s*(Damage|Strength|Defense|Health|Speed|Crit Chance|Crit Damage|Intelligence|Ferocity|Attack Speed|Mining Speed|Mining Fortune|Magic Find|Pet Luck|True Defense|Sea Creature Chance|Ability Damage|Farming Fortune|Foraging Fortune|Health Regen|Vitality|Mending): .*$",
                 "^\\s*[-=_]{4,}\\s*$"
               ]

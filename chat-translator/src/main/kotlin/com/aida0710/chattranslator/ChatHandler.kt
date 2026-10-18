@@ -7,6 +7,8 @@ import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.HoverEvent
 import net.minecraft.network.chat.MutableComponent
+import net.minecraft.network.chat.Style
+import java.util.Optional
 
 /**
  * 受信チャットを翻訳する。
@@ -78,12 +80,55 @@ class ChatHandler(private val translator: Translator) {
     private fun register(original: Component, prefix: String, translated: String): Component {
         val id = nextId++
         val hover = HoverEvent.ShowText(Component.literal("原文: ").withStyle(ChatFormatting.GRAY).append(original.copy()))
-        val body: MutableComponent =
-            if (prefix.isEmpty()) Component.literal(translated)
-            else Component.literal("$prefix: ").withStyle(ChatFormatting.GRAY).append(Component.literal(translated).withStyle(ChatFormatting.WHITE))
-        val component = body.withStyle { it.withHoverEvent(hover) }.append(button(id, "[原文]", "クリックで原文を表示"))
+        // "[MVP+] Name: " の部分は原文の装飾のまま残し、本文は原文本文の先頭の装飾を引き継ぐ
+        val (head, bodyStyle, bodyCodes) = splitStyled(original, if (prefix.isEmpty()) 0 else prefix.length + 2)
+        val component = Component.empty()
+            .append(head)
+            .append(Component.literal(bodyCodes + translated).withStyle(bodyStyle.withHoverEvent(hover)))
+            .append(button(id, "[原文]", "クリックで原文を表示"))
         entries[id] = Entry(original, component, component)
         return component
+    }
+
+    private data class Split(val head: MutableComponent, val bodyStyle: Style, val bodyCodes: String)
+
+    /**
+     * 原文の先頭 visibleChars 文字 (§ 書式コードを除いた文字数) を装飾付きのまま切り出し、
+     * それに続く本文の最初の文字の装飾 (Style と有効な § コード) を返す。
+     */
+    private fun splitStyled(original: Component, visibleChars: Int): Split {
+        val head = Component.empty()
+        var count = 0
+        var bodyStyle: Style? = null
+        var bodyCodes = ""
+        original.visit<Unit>({ style, contents ->
+            val sb = StringBuilder()
+            var codes = ""
+            var i = 0
+            while (i < contents.length) {
+                val c = contents[i]
+                if (c == '§' && i + 1 < contents.length) {
+                    val code = contents.substring(i, i + 2)
+                    // 色コードはそれまでの書式をリセットする
+                    codes = if (code[1].lowercaseChar() in "0123456789abcdefr") code else codes + code
+                    if (count < visibleChars) sb.append(code)
+                    i += 2
+                    continue
+                }
+                if (count < visibleChars) {
+                    sb.append(c)
+                    count++
+                } else if (!c.isWhitespace()) {
+                    bodyStyle = style
+                    bodyCodes = codes
+                    break
+                }
+                i++
+            }
+            if (sb.isNotEmpty()) head.append(Component.literal(sb.toString()).withStyle(style))
+            if (bodyStyle != null) Optional.of(Unit) else Optional.empty()
+        }, Style.EMPTY)
+        return Split(head, bodyStyle ?: Style.EMPTY, bodyCodes)
     }
 
     private fun button(id: Int, label: String, tooltip: String): Component =

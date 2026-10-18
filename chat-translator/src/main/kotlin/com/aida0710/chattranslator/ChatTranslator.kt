@@ -38,12 +38,15 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
 
     private val dataDir = FMLPaths.CONFIGDIR.get().resolve(MODID)
     private val glossary = Glossary(dataDir.resolve("glossary.json"))
+    private val itemNames = ItemNames(dataDir.resolve("skyblock_items.json"))
     private lateinit var cache: TranslationCache
     private lateinit var translator: Translator
     private lateinit var chat: ChatHandler
     private lateinit var tooltip: TooltipHandler
+    private var selfTest: SelfTest? = null
     private val notices = ConcurrentLinkedQueue<Pair<String, Boolean>>()
     private val ollama = OllamaManager { message, progress -> queueNotice(message, progress) }
+    private val llama = LlamaServerManager(dataDir.resolve("llama")) { message, progress -> queueNotice(message, progress) }
 
     private val category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MODID, "main"))
     private val toggleChatKey = KeyMapping("key.chattranslator.toggle_chat", InputConstants.UNKNOWN.value, category)
@@ -89,18 +92,37 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         if (ready()) return
         glossary.load()
         cache = TranslationCache(dataDir.resolve("cache.json"), TranslatorConfig.current.maxCacheEntries).also { it.load() }
-        translator = Translator(LlmClient(), cache, glossary)
+        translator = Translator(LlmClient { llama.endpoint }, cache, glossary, itemNames)
+        itemNames.loadAsync(TranslatorConfig.current.protectItemNames)
         chat = ChatHandler(translator)
         LOGGER.info("Chat replace mode available: {}", chat.canReplace)
         tooltip = TooltipHandler(translator) { isHeld(showOriginalKey) }
+        System.getProperty("chattranslator.selftest")?.let { dir ->
+            selfTest = SelfTest(java.nio.file.Path.of(dir), chat) { llama.endpoint != null || TranslatorConfig.current.backendMode == BackendMode.EXTERNAL }
+            LOGGER.warn("SELFTEST enabled: {}", dir)
+        }
 
         val saver = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "ChatTranslator-cache").apply { isDaemon = true } }
         saver.scheduleWithFixedDelay({ cache.saveIfDirty() }, 60, 60, TimeUnit.SECONDS)
-        Runtime.getRuntime().addShutdownHook(Thread({ translator.shutdown() }, "ChatTranslator-shutdown"))
-        LOGGER.info("ChatTranslator ready: model={} endpoint={} cache={} entries",
-            TranslatorConfig.current.model, TranslatorConfig.current.endpoint, cache.size())
-        // 起動直後にモデル確認 (Ollama なら未取得時に自動 pull)
-        ollama.checkAsync(TranslatorConfig.current)
+        Runtime.getRuntime().addShutdownHook(Thread({
+            translator.shutdown()
+            llama.stop()
+        }, "ChatTranslator-shutdown"))
+        val cfg = TranslatorConfig.current
+        LOGGER.info("ChatTranslator ready: backend={} model={} cache={} entries", cfg.backendMode, cfg.modelKey, cache.size())
+        startBackend(cfg)
+    }
+
+    private fun startBackend(cfg: TranslatorConfig.Values) = when (cfg.backendMode) {
+        // llama.cpp とモデルを自動ダウンロードして起動
+        BackendMode.BUILTIN -> llama.startAsync(cfg)
+        // 外部サーバー: Ollama なら未取得時に自動 pull
+        BackendMode.EXTERNAL -> ollama.checkAsync(cfg)
+    }
+
+    private fun backendStatus(cfg: TranslatorConfig.Values) = when (cfg.backendMode) {
+        BackendMode.BUILTIN -> "builtin/${cfg.gpuBackend} ${llama.state}"
+        BackendMode.EXTERNAL -> "external ${cfg.endpoint} ${ollama.state}"
     }
 
 
@@ -125,15 +147,24 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
     }
 
     private fun onLoggedIn() {
-        // 起動時に LLM が落ちていた場合などに備えて再確認
-        if (ready() && ollama.state in setOf(OllamaManager.State.NOT_RUNNING, OllamaManager.State.FAILED)) {
-            ollama.checkAsync(TranslatorConfig.current)
+        if (!ready()) return
+        val cfg = TranslatorConfig.current
+        when (cfg.backendMode) {
+            BackendMode.BUILTIN -> when (llama.state) {
+                LlamaServerManager.State.FAILED -> llama.startAsync(cfg)
+                LlamaServerManager.State.DOWNLOADING, LlamaServerManager.State.STARTING ->
+                    queueNotice("翻訳エンジンを準備中です。完了するまで原文のまま表示されます", false)
+                else -> {}
+            }
+            // 起動時に LLM が落ちていた場合などに備えて再確認
+            BackendMode.EXTERNAL -> if (ollama.state in setOf(OllamaManager.State.NOT_RUNNING, OllamaManager.State.FAILED)) ollama.checkAsync(cfg)
         }
     }
 
     private fun onClientTick() {
         if (!ready()) return
         flushNotices()
+        selfTest?.onTick()
         while (toggleChatKey.consumeClick()) {
             chat.enabled = !chat.enabled
             notify("チャット翻訳", chat.enabled)
@@ -158,7 +189,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
             Commands.literal("chattranslator")
                 .then(Commands.literal("status").executes { ctx ->
                     val c = TranslatorConfig.current
-                    reply(ctx.source, "chat=${chat.enabled && c.chatEnabled} (${c.chatDisplayMode}) tooltip=${tooltip.enabled && c.tooltipEnabled} model=${c.model} (${ollama.state}) endpoint=${c.endpoint} cache=${cache.size()}")
+                    reply(ctx.source, "chat=${chat.enabled && c.chatEnabled} (${c.chatDisplayMode}) tooltip=${tooltip.enabled && c.tooltipEnabled} model=${c.modelKey} backend=${backendStatus(c)} cache=${cache.size()}")
                     1
                 })
                 .then(Commands.literal("swap").then(Commands.argument("id", IntegerArgumentType.integer(0)).executes { ctx ->
@@ -167,8 +198,15 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
                     1
                 }))
                 .then(Commands.literal("pull").executes { ctx ->
-                    reply(ctx.source, "${TranslatorConfig.current.model} を確認/ダウンロードします")
-                    ollama.checkAsync(TranslatorConfig.current, forcePull = true)
+                    val c = TranslatorConfig.current
+                    if (c.backendMode == BackendMode.BUILTIN) {
+                        reply(ctx.source, "内蔵サーバーを再起動します (未ダウンロードのファイルがあれば取得します)")
+                        llama.stop()
+                        llama.startAsync(c)
+                    } else {
+                        reply(ctx.source, "${c.model} を確認/ダウンロードします")
+                        ollama.checkAsync(c, forcePull = true)
+                    }
                     1
                 })
                 .then(Commands.literal("reload").executes { ctx ->
