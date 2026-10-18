@@ -21,7 +21,8 @@ class ItemNames(private val file: Path) {
     @Volatile private var byFirstWord: Map<String, List<String>> = emptyMap()
     @Volatile private var all: Set<String> = emptySet()
 
-    val size get() = all.size
+    /** 保護対象の語数 (アイテム名 + keep) */
+    val size get() = all.size + extra.size
 
     fun loadAsync(enabled: Boolean) {
         if (!enabled) return
@@ -56,7 +57,7 @@ class ItemNames(private val file: Path) {
 
     /** 文中の既知アイテム名を ITEM1, ITEM2… に置き換える */
     fun protect(text: String): Protected {
-        if (all.isEmpty()) return Protected(text, emptyList())
+        if (byFirstWord.isEmpty()) return Protected(text, emptyList())
         val out = StringBuilder()
         val names = mutableListOf<String>()
         var i = 0
@@ -89,18 +90,31 @@ class ItemNames(private val file: Path) {
         var result = translated
         // ITEM1 が ITEM10 の一部を置換しないよう大きい番号から
         for (n in names.indices.reversed()) {
-            val token = "ITEM${n + 1}"
-            if (!result.contains(token)) return null
-            result = result.replace(token, names[n])
+            // "ITEM1" のほか、モデルが変えてしまった "ＩＴＥＭ１" "アイテム1" "[ITEM1]" も受け付ける
+            val digits = (n + 1).toString().map { d -> "[$d${(d + 0xFEE0)}]" }.joinToString("")
+            val token = Regex("[\\[［]?(?:[IＩ][TＴ][EＥ][MＭ]|アイテム) ?$digits(?![0-9０-９])[\\]］]?")
+            if (!token.containsMatchIn(result)) return null
+            result = token.replace(result, Regex.escapeReplacement(names[n]))
         }
         return result
     }
 
     private fun set(names: Collection<String>) {
         // 一般的な短い単語 ("Stick", "Stone" など) まで保護すると不自然になるため、複数語か 7 文字以上のみ
-        val usable = names.map { TextUtil.stripFormatting(it).trim() }.filter { it.contains(' ') || it.length >= 7 }.toSet()
-        all = usable
-        byFirstWord = usable.groupBy { it.takeWhile { c -> c.isLetterOrDigit() || c == '\'' }.lowercase() }
+        all = names.map { TextUtil.stripFormatting(it).trim() }.filter { it.contains(' ') || it.length >= 7 }.toSet()
+        rebuild()
+    }
+
+    /** glossary.json の "keep" (地名などの固有名詞)。長さに関係なく文中で保護する */
+    fun setExtra(terms: Collection<String>) {
+        extra = terms.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        rebuild()
+    }
+
+    @Volatile private var extra: Set<String> = emptySet()
+
+    private fun rebuild() {
+        byFirstWord = (all + extra).groupBy { it.takeWhile { c -> c.isLetterOrDigit() || c == '\'' }.lowercase() }
             .mapValues { (_, v) -> v.sortedByDescending { it.length } }
     }
 

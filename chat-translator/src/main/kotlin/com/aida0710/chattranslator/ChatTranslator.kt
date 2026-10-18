@@ -91,6 +91,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         TranslatorConfig.reload()
         if (ready()) return
         glossary.load()
+        itemNames.setExtra(glossary.keep)
         cache = TranslationCache(dataDir.resolve("cache.json"), TranslatorConfig.current.maxCacheEntries).also { it.load() }
         translator = Translator(LlmClient { llama.endpoint }, cache, glossary, itemNames)
         itemNames.loadAsync(TranslatorConfig.current.protectItemNames)
@@ -211,6 +212,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
                 })
                 .then(Commands.literal("reload").executes { ctx ->
                     glossary.load()
+                    itemNames.setExtra(glossary.keep)
                     reply(ctx.source, "glossary.json を再読み込みしました")
                     1
                 })

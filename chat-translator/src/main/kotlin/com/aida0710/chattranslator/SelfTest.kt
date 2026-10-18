@@ -67,19 +67,12 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             // [原文] ボタンをクリックしたときと同じ経路 (ClickEvent.RunCommand → クライアントコマンド) で実行する
             "click" -> mc.player!!.connection.sendUnattendedCommand("chattranslator swap ${args[1]}", null)
             "tooltip" -> {
-                val stack = ItemStack(Items.DIAMOND_SWORD).apply {
-                    set(DataComponents.CUSTOM_NAME, Component.literal("§6Aspect of the Dragons"))
-                    set(DataComponents.LORE, ItemLore(listOf(
-                        "§7Damage: §c+225",
-                        "§6Ability: Dragon Rage §e§lRIGHT CLICK",
-                        "§7All monsters in front of you take §a12,000 §7damage.",
-                        "§8This item can be reforged!",
-                        "§6§lLEGENDARY SWORD",
-                    ).map { Component.literal(it) }))
-                }
+                val stack = hyperion()
                 tooltip(stack).forEachIndexed { i, l -> log("tooltip-before[$i] $l") }
                 tooltipWatch = stack to 200
             }
+            // ツールチップを実際に画面へ描画する (スクリーンショット確認用)
+            "showtooltip" -> mc.gui.setScreen(TooltipPreview(hyperion()))
             // 開発環境ではバニラサーバーに接続すると Forge 自身の設定未読込エラーになるため、シングルプレイで試す
             "world" -> {
                 // 既存ワールドを開くと「実験的設定」の確認画面で止まるので毎回新規作成する
@@ -105,6 +98,42 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
         }
     }
 
+
+    /** Hypixel SkyBlock の実際の lore に近いアイテム (1 文が複数行に折り返されている) */
+    private fun hyperion() = ItemStack(Items.IRON_SWORD).apply {
+        set(DataComponents.CUSTOM_NAME, Component.literal("§dHeroic Hyperion §6✪✪✪✪✪"))
+        set(DataComponents.LORE, ItemLore(listOf(
+            "§7Gear Score: §d1002",
+            "§7Damage: §c+270",
+            "§7Strength: §c+150",
+            "§7Intelligence: §a+350",
+            "",
+            "§7Deals §c+50% §7damage to",
+            "§7Withers. Grants §c+1 §c❁ Damage",
+            "§7and §a+2 §b✎ Intelligence",
+            "§7per §cCatacombs §7level.",
+            "",
+            "§6Ability: Wither Impact  §e§lRIGHT CLICK",
+            "§7Teleport §a10 blocks§7 ahead of you.",
+            "§7Then implode dealing §c10,000",
+            "§7damage to nearby enemies. Also",
+            "§7applies the wither shield scroll",
+            "§7ability reducing damage taken",
+            "§7and granting an absorption",
+            "§7shield for §e5 §7seconds.",
+            "§8Mana Cost: §3300",
+            "",
+            "§7This item can be reforged!",
+            "§d§lMYTHIC DUNGEON SWORD",
+        ).map { Component.literal(it) }))
+    }
+
+    private class TooltipPreview(private val stack: ItemStack) : net.minecraft.client.gui.screens.Screen(Component.literal("preview")) {
+        override fun extractRenderState(graphics: net.minecraft.client.gui.GuiGraphicsExtractor, mouseX: Int, mouseY: Int, a: Float) {
+            super.extractRenderState(graphics, mouseX, mouseY, a)
+            graphics.setTooltipForNextFrame(font, stack, 8, 16)
+        }
+    }
     private fun tooltip(stack: ItemStack): List<String> {
         val mc = Minecraft.getInstance()
         return stack.getTooltipLines(Item.TooltipContext.of(mc.level), mc.player, TooltipFlag.Default.NORMAL).map { it.string }

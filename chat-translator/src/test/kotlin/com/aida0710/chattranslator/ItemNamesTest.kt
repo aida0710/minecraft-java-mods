@@ -54,4 +54,12 @@ class ItemNamesTest {
         val p = names.protect("RARE DROP! Summoning Eye (+150% Magic Find)")
         assertNull(names.restore("貴重なアイテム！ (魔法の発見力 +150%)", p.names))
     }
+
+    @Test
+    fun restoreToleratesModelVariants() {
+        val p = names.protect("per Hyperion level")
+        assertEquals("Hyperion レベル！", names.restore("ＩＴＥＭ１ レベル！", p.names))
+        assertEquals("Hyperionレベル", names.restore("アイテム1レベル", p.names))
+        assertEquals("Hyperion のレベル？", names.restore("[ITEM1] のレベル？", p.names))
+    }
 }

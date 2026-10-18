@@ -35,7 +35,7 @@ class Translator(
      */
     private fun key(text: String): String {
         val cfg = TranslatorConfig.current
-        val tag = if (cfg.protectItemNames && itemNames.size > 0) "|items" else ""
+        val tag = if (itemNames.size > 0) "|items" else ""
         return cfg.modelKey + tag + "\u0000" + text
     }
 
@@ -106,13 +106,13 @@ class Translator(
 
     /** 既知のアイテム名を ITEMn に置き換えて訳し、元に戻す。プレースホルダーが崩れたら通常の翻訳にする */
     private fun translateProtected(text: String): String {
-        if (!TranslatorConfig.current.protectItemNames) return client.translate(text)
+        // アイテム名 (protectItemNames が ON のときのみ読み込まれる) と glossary の keep を保護する
         val p = itemNames.protect(text)
         if (p.names.isEmpty()) return client.translate(text)
         // アイテム名だけの文 (記号のみ残る) は訳さない
         if (p.text.replace(PLACEHOLDER, "").none { it.isLetter() }) return text
         itemNames.restore(client.translate(p.text), p.names)?.let { return it }
-        ChatTranslator.LOGGER.debug("Placeholder lost; retrying without item protection: {}", text)
+        ChatTranslator.LOGGER.info("Protected term lost in translation; retrying without protection: {}", text)
         return client.translate(text)
     }
 

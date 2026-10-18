@@ -7,12 +7,15 @@ import java.nio.file.Path
 
 /**
  * ユーザー辞書 (config/chattranslator/glossary.json)。
- *  - "terms": 完全一致で置き換える訳語。値を原文と同じにすれば「翻訳しない」指定になる。
+ *  - "terms": 行 (段落) 全体が完全一致したときに使う訳語。値を原文と同じにすれば「翻訳しない」指定になる。
+ *  - "keep":  文中に出てきても英語のまま残す語 (地名・固有名詞など)。SkyBlock のアイテム名は自動で保護される。
  *  - "skip":  この正規表現にマッチする行は翻訳しない。
  */
 class Glossary(private val file: Path) {
     @Volatile private var terms: Map<String, String> = emptyMap()
     @Volatile private var skip: List<Regex> = emptyList()
+    @Volatile var keep: List<String> = emptyList()
+        private set
 
     fun lookup(text: String): String? = terms[text.trim()]
 
@@ -23,12 +26,13 @@ class Glossary(private val file: Path) {
         runCatching {
             val json = Files.newBufferedReader(file).use { GsonBuilder().create().fromJson(it, JsonObject::class.java) }
             terms = json.getAsJsonObject("terms")?.entrySet()?.associate { it.key to it.value.asString } ?: emptyMap()
+            keep = json.getAsJsonArray("keep")?.map { it.asString } ?: emptyList()
             skip = json.getAsJsonArray("skip")?.mapNotNull { e ->
                 runCatching { Regex(e.asString) }.onFailure {
                     ChatTranslator.LOGGER.warn("Invalid skip regex in glossary: {}", e.asString)
                 }.getOrNull()
             } ?: emptyList()
-            ChatTranslator.LOGGER.info("Glossary loaded: {} terms, {} skip patterns", terms.size, skip.size)
+            ChatTranslator.LOGGER.info("Glossary loaded: {} terms, {} keep, {} skip patterns", terms.size, keep.size, skip.size)
         }.onFailure { ChatTranslator.LOGGER.warn("Failed to load glossary {}", file, it) }
     }
 
@@ -41,16 +45,25 @@ class Glossary(private val file: Path) {
         val DEFAULT = """
             {
               "terms": {
-                "Hyperion": "Hyperion",
-                "Aspect of the End": "Aspect of the End",
-                "Skyblock Menu (Click)": "スカイブロックメニュー (クリック)",
+                "SkyBlock Menu (Click)": "スカイブロックメニュー (クリック)",
                 "Click to view!": "クリックして表示！",
-                "Right-click to view recipes!": "右クリックでレシピ表示！"
+                "Click to open!": "クリックして開く！",
+                "Right-click to view recipes!": "右クリックでレシピ表示！",
+                "This item can be reforged!": "このアイテムはリフォージできます！"
               },
+              "keep": [
+                "Catacombs", "Master Mode", "Dungeon Hub", "Hub", "Private Island", "Bazaar", "Auction House",
+                "Dwarven Mines", "Crystal Hollows", "Deep Caverns", "Gold Mine", "Spider's Den", "The End", "The Park",
+                "The Barn", "Mushroom Desert", "Crimson Isle", "Kuudra", "Garden", "The Rift", "Jerry's Workshop",
+                "Slayer", "Revenant Horror", "Tarantula Broodfather", "Sven Packmaster", "Voidgloom Seraph", "Inferno Demonlord",
+                "Riftstalker Bloodfiend", "Wither Shield", "Necron", "Goldor", "Storm", "Maxor", "Bonzo", "Scarf",
+                "The Professor", "Thorn", "Livid", "Sadan", "Jerry", "Mort", "Kat", "Elizabeth", "SkyBlock"
+              ],
               "skip": [
                 "^\\s*(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC|DIVINE|SPECIAL|VERY SPECIAL)( [A-Z ]+)?$",
-                "^\\s*(Damage|Strength|Defense|Health|Speed|Crit Chance|Crit Damage|Intelligence|Ferocity|Attack Speed|Mining Speed|Mining Fortune|Magic Find|Pet Luck|True Defense|Sea Creature Chance|Ability Damage|Farming Fortune|Foraging Fortune|Health Regen|Vitality|Mending): .*$",
-                "^\\s*[-=_]{4,}\\s*$"
+                "^\\s*(Gear Score|Damage|Strength|Defense|Health|Speed|Crit Chance|Crit Damage|Intelligence|Ferocity|Attack Speed|Bonus Attack Speed|Mining Speed|Mining Fortune|Magic Find|Pet Luck|True Defense|Sea Creature Chance|Ability Damage|Farming Fortune|Foraging Fortune|Health Regen|Vitality|Mending|Swing Range|Breaking Power|Pristine|Fishing Speed): .*$",
+                "^\\s*(Mana Cost|Cooldown|Soulflow Cost|Health Cost): .*$",
+                "^\\s*[-=_▬]{4,}\\s*$"
               ]
             }
         """.trimIndent()
