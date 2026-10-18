@@ -13,12 +13,18 @@ Hypixel SkyBlock での利用を想定しています。
 
 ```powershell
 winget install Ollama.Ollama
-ollama pull translategemma:4b     # 3.3GB。VRAM 6GB 程度〜。チャット用途ならこれで十分
-# 余裕があれば品質重視で
-ollama pull translategemma:12b    # 8.1GB
 ```
 
 Ollama を起動しておけば `http://localhost:11434/v1` で待ち受けます (設定変更不要)。
+**モデルは mod が起動時に自動でダウンロード (pull) します** (`llm.autoPull = true`)。進捗はワールド参加後にアクションバーに表示されます。
+手動で入れる場合や品質重視のモデルにする場合:
+
+```powershell
+ollama pull translategemma:4b     # 3.3GB。VRAM 6GB 程度〜。チャット用途ならこれで十分
+ollama pull translategemma:12b    # 8.1GB。config の model を変更
+```
+
+> Ollama 本体のインストールと起動はご自身でお願いします。LM Studio / llama.cpp の場合は自動 pull は行わず、そちらでモデルを読み込んでください。
 
 ### モデルの選択肢
 
@@ -37,18 +43,23 @@ Ollama を起動しておけば `http://localhost:11434/v1` で待ち受けま�
 
 ## 3. 使い方
 
-- チャット: 英文を受信すると、その下に ` ⤷ 訳文` が灰色で追加表示されます
-  - Hypixel ではシステムメッセージ (ロビー告知・ドロップ通知など) も翻訳対象になるため、チャット量がほぼ倍になります。うるさい場合は glossary.json の `skip` に除外パターンを追加してください (Hypixel はプレイヤー発言もシステムメッセージとして送るので、`chat.translateSystemMessages = false` にするとほぼ何も翻訳されなくなります)
-  - `chat.showOriginal = false` で原文を隠して訳文のみ表示 (翻訳失敗時は原文を表示)
+- チャット (`chat.displayMode`)
+  - `REPLACE` (デフォルト): 原文をいったん表示し、訳が届いた時点で**同じ行を訳文に書き換えます** (順序は崩れません)
+    - 行末の **`[原文]`** をクリックすると原文に戻り、**`[訳]`** で再び訳文に切り替わります
+    - 訳文にカーソルを合わせると原文がツールチップで表示されます
+    - 複数行のメッセージは装飾が崩れないよう下に訳文を追加表示します
+  - `APPEND`: 原文の下に ` ⤷ 訳文` を灰色で追加表示します
   - `[MVP+] Name: message` のような形式は名前部分を除いて本文だけ翻訳します
+  - Hypixel はプレイヤー発言もシステムメッセージとして送るので、`chat.translateSystemMessages = false` にするとほぼ何も翻訳されなくなります。不要なメッセージは glossary.json の `skip` で除外してください
 - ツールチップ: アイテムにカーソルを合わせると、未翻訳の行は裏で翻訳が始まり、完了次第訳文に切り替わります
   - 一度訳した文は `config/chattranslator/cache.json` に保存され、次回から即時表示
 - キー操作 (設定 > 操作 で変更可)
   - `J` (押している間): ツールチップを原文表示に戻す (インベントリを開いたまま使えます)
   - 未割当: チャット翻訳 ON/OFF、ツールチップ翻訳 ON/OFF (インベントリを閉じた状態で押す)
 - クライアントコマンド
-  - `/chattranslator status` — 状態表示
+  - `/chattranslator status` — 状態表示 (モデルの準備状況を含む)
   - `/chattranslator test <英文>` — LLM との接続テスト
+  - `/chattranslator pull` — モデルを (再) ダウンロード (Ollama のみ)
   - `/chattranslator reload` — glossary.json の再読み込み
   - `/chattranslator clearcache` — 翻訳キャッシュを削除
 
@@ -76,7 +87,7 @@ Ollama を起動しておけば `http://localhost:11434/v1` で待ち受けま�
   - 1 行の中で色が混在している場合、訳文は行頭の色 1 色になります
   - 行単位の翻訳なので、複数行にまたがる文は不自然になることがあります
   - ステータス値など数値が頻繁に変わる行はキャッシュが効きにくいため、`skip` で除外するのがおすすめ
-- 訳文のみ表示モードでは、翻訳待ちの間にメッセージの順序が前後することがあります
+- `REPLACE` モードでは、翻訳が届くまでの数秒間は原文が表示されます。チャット欄を開いてスクロールしている最中に書き換わると表示位置が少しずれることがあります
 - この mod はクライアント側の表示を変えるだけで、サーバーへ何かを送信することはありません。Hypixel のルール (Allowed Modifications) に照らしての利用可否はご自身で判断してください
 
 ## 開発

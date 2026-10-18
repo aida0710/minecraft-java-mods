@@ -15,6 +15,9 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 kotlin.jvmToolchain(25)
 
 minecraft {
+    // src/main/resources/META-INF/accesstransformer.cfg を適用する
+    accessTransformer = true
+
     runs {
         configureEach {
             workingDir = layout.projectDirectory.dir('run')

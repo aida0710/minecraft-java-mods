@@ -3,10 +3,12 @@ package com.aida0710.chattranslator
 import net.minecraftforge.common.ForgeConfigSpec
 
 /** config/chattranslator-client.toml の定義。読み込み/リロードのたびに [current] を差し替える。 */
+enum class ChatDisplayMode { REPLACE, APPEND }
+
 object TranslatorConfig {
     data class Values(
         val chatEnabled: Boolean,
-        val chatShowOriginal: Boolean,
+        val chatDisplayMode: ChatDisplayMode,
         val chatTranslateSystemMessages: Boolean,
         val tooltipEnabled: Boolean,
         val tooltipTranslateItemName: Boolean,
@@ -23,6 +25,7 @@ object TranslatorConfig {
         val sourceCode: String,
         val targetLang: String,
         val targetCode: String,
+        val autoPull: Boolean,
         val maxCacheEntries: Int,
     ) {
         fun buildPrompt(text: String): String = promptTemplate
@@ -45,7 +48,7 @@ object TranslatorConfig {
     private val builder = ForgeConfigSpec.Builder()
 
     private val chatEnabled: ForgeConfigSpec.BooleanValue
-    private val chatShowOriginal: ForgeConfigSpec.BooleanValue
+    private val chatDisplayMode: ForgeConfigSpec.EnumValue<ChatDisplayMode>
     private val chatSystem: ForgeConfigSpec.BooleanValue
     private val tooltipEnabled: ForgeConfigSpec.BooleanValue
     private val tooltipItemName: ForgeConfigSpec.BooleanValue
@@ -62,6 +65,7 @@ object TranslatorConfig {
     private val sourceCode: ForgeConfigSpec.ConfigValue<String>
     private val targetLang: ForgeConfigSpec.ConfigValue<String>
     private val targetCode: ForgeConfigSpec.ConfigValue<String>
+    private val autoPull: ForgeConfigSpec.BooleanValue
     private val maxCache: ForgeConfigSpec.IntValue
 
     val SPEC: ForgeConfigSpec
@@ -69,8 +73,11 @@ object TranslatorConfig {
     init {
         builder.push("chat")
         chatEnabled = builder.comment("チャットを翻訳する").define("enabled", true)
-        chatShowOriginal = builder.comment("true: 原文の下に訳文を追加表示 / false: 訳文のみ表示 (原文は非表示)")
-            .define("showOriginal", true)
+        chatDisplayMode = builder.comment(
+            "REPLACE: 原文を訳文に置き換える (行末の [原文] をクリックで切り替え、訳文にカーソルを合わせても原文を表示)",
+            "APPEND:  原文の下に訳文を追加表示する",
+        )
+            .defineEnum("displayMode", ChatDisplayMode.REPLACE)
         chatSystem = builder.comment("プレイヤー発言以外のシステムメッセージも翻訳する").define("translateSystemMessages", true)
         builder.pop()
 
@@ -103,6 +110,7 @@ object TranslatorConfig {
         sourceCode = builder.define("sourceCode", "en")
         targetLang = builder.define("targetLang", "Japanese")
         targetCode = builder.define("targetCode", "ja")
+        autoPull = builder.comment("Ollama 使用時、モデルが未ダウンロードなら起動時に自動で pull する").define("autoPull", true)
         builder.pop()
 
         builder.push("cache")
@@ -118,7 +126,7 @@ object TranslatorConfig {
     fun reload() {
         current = Values(
             chatEnabled = chatEnabled.get(),
-            chatShowOriginal = chatShowOriginal.get(),
+            chatDisplayMode = chatDisplayMode.get(),
             chatTranslateSystemMessages = chatSystem.get(),
             tooltipEnabled = tooltipEnabled.get(),
             tooltipTranslateItemName = tooltipItemName.get(),
@@ -135,16 +143,17 @@ object TranslatorConfig {
             sourceCode = sourceCode.get(),
             targetLang = targetLang.get(),
             targetCode = targetCode.get(),
+            autoPull = autoPull.get(),
             maxCacheEntries = maxCache.get(),
         )
     }
 
     private fun defaults() = Values(
-        chatEnabled = true, chatShowOriginal = true, chatTranslateSystemMessages = true,
+        chatEnabled = true, chatDisplayMode = ChatDisplayMode.REPLACE, chatTranslateSystemMessages = true,
         tooltipEnabled = true, tooltipTranslateItemName = true, tooltipShowOriginal = false,
         minLength = 3, endpoint = "http://localhost:11434/v1", model = "translategemma:4b", apiKey = "",
         temperature = 0.0, timeoutSeconds = 30, systemPrompt = "", promptTemplate = TRANSLATEGEMMA_PROMPT,
-        sourceLang = "English", sourceCode = "en", targetLang = "Japanese", targetCode = "ja",
+        sourceLang = "English", sourceCode = "en", targetLang = "Japanese", targetCode = "ja", autoPull = true,
         maxCacheEntries = 20000,
     )
 }
