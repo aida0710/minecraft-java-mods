@@ -31,20 +31,21 @@ Ollama を起動しておけば `http://localhost:11434/v1` で待ち受けま�
 
 ## 2. 導入
 
-1. [Actions](../../actions) の最新ビルドの Artifact、または Release から `chattranslator-x.y.z.jar` を取得
+1. [Actions](https://github.com/aida0710/minecraft-forge-mods/actions) の最新ビルドの Artifact、または Release から `chattranslator-x.y.z.jar` を取得
 2. `.minecraft/mods/` (Prism Launcher ならインスタンスの `mods/`) に配置
 3. 起動すると `config/chattranslator-client.toml` と `config/chattranslator/glossary.json` が生成されます
 
 ## 3. 使い方
 
 - チャット: 英文を受信すると、その下に ` ⤷ 訳文` が灰色で追加表示されます
+  - Hypixel ではシステムメッセージ (ロビー告知・ドロップ通知など) も翻訳対象になるため、チャット量がほぼ倍になります。うるさい場合は glossary.json の `skip` に除外パターンを追加してください (Hypixel はプレイヤー発言もシステムメッセージとして送るので、`chat.translateSystemMessages = false` にするとほぼ何も翻訳されなくなります)
   - `chat.showOriginal = false` で原文を隠して訳文のみ表示 (翻訳失敗時は原文を表示)
   - `[MVP+] Name: message` のような形式は名前部分を除いて本文だけ翻訳します
 - ツールチップ: アイテムにカーソルを合わせると、未翻訳の行は裏で翻訳が始まり、完了次第訳文に切り替わります
   - 一度訳した文は `config/chattranslator/cache.json` に保存され、次回から即時表示
 - キー操作 (設定 > 操作 で変更可)
-  - `J`: ツールチップ翻訳 ON/OFF (原文を確認したいときに)
-  - 未割当: チャット翻訳 ON/OFF
+  - `J` (押している間): ツールチップを原文表示に戻す (インベントリを開いたまま使えます)
+  - 未割当: チャット翻訳 ON/OFF、ツールチップ翻訳 ON/OFF (インベントリを閉じた状態で押す)
 - クライアントコマンド
   - `/chattranslator status` — 状態表示
   - `/chattranslator test <英文>` — LLM との接続テスト

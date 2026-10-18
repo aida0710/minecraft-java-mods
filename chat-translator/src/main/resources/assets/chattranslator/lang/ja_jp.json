@@ -1,5 +1,6 @@
 {
   "key.category.chattranslator.main": "Chat Translator",
   "key.chattranslator.toggle_chat": "チャット翻訳 ON/OFF",
-  "key.chattranslator.toggle_tooltip": "ツールチップ翻訳 ON/OFF"
+  "key.chattranslator.toggle_tooltip": "ツールチップ翻訳 ON/OFF",
+  "key.chattranslator.show_original": "押している間ツールチップの原文を表示"
 }

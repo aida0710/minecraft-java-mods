@@ -68,8 +68,6 @@ tasks.named('shadowJar') {
     archiveClassifier = ''
     configurations = [project.configurations.shade]
     relocate 'kotlin', 'com.aida0710.chattranslator.shadow.kotlin'
-    // 未使用の stdlib クラスを除去して jar を小さくする (リフレクションは使っていない)
-    minimize()
     // 同梱すると Forge のモジュールシステムと衝突するため除外
     exclude 'module-info.class', 'META-INF/versions/*/module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
     manifest.attributes('Implementation-Version': mod_version)

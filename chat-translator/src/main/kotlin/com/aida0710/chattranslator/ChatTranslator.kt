@@ -43,7 +43,8 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
 
     private val category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MODID, "main"))
     private val toggleChatKey = KeyMapping("key.chattranslator.toggle_chat", InputConstants.UNKNOWN.value, category)
-    private val toggleTooltipKey = KeyMapping("key.chattranslator.toggle_tooltip", InputConstants.KEY_J, category)
+    private val toggleTooltipKey = KeyMapping("key.chattranslator.toggle_tooltip", InputConstants.UNKNOWN.value, category)
+    private val showOriginalKey = KeyMapping("key.chattranslator.show_original", InputConstants.KEY_J, category)
 
     init {
         context.registerConfig(ModConfig.Type.CLIENT, TranslatorConfig.SPEC)
@@ -51,7 +52,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         ModConfigEvent.Loading.getBus(modBus).addListener { if (it.config.modId == MODID) onConfigLoaded() }
         ModConfigEvent.Reloading.getBus(modBus).addListener { if (it.config.modId == MODID) TranslatorConfig.reload() }
 
-        RegisterKeyMappingsEvent.BUS.addListener { it.register(toggleChatKey); it.register(toggleTooltipKey) }
+        RegisterKeyMappingsEvent.BUS.addListener { it.register(toggleChatKey); it.register(toggleTooltipKey); it.register(showOriginalKey) }
         RegisterClientCommandsEvent.BUS.addListener { registerCommands(it.dispatcher) }
 
         // Hypixel はプレイヤー発言も含めほぼ全てシステムメッセージとして送ってくる
@@ -67,6 +68,12 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
 
     private fun ready() = ::translator.isInitialized
 
+    /** インベントリ画面中は KeyMapping の状態が更新されないため、キーボードの生の状態を見る */
+    private fun isHeld(key: KeyMapping): Boolean {
+        val k = key.key
+        return k.type == InputConstants.Type.KEYBOARD && k.value > 0 && InputConstants.isKeyDown(k.value)
+    }
+
     private fun onConfigLoaded() {
         TranslatorConfig.reload()
         if (ready()) return
@@ -74,7 +81,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         cache = TranslationCache(dataDir.resolve("cache.json"), TranslatorConfig.current.maxCacheEntries).also { it.load() }
         translator = Translator(LlmClient(), cache, glossary)
         chat = ChatHandler(translator)
-        tooltip = TooltipHandler(translator)
+        tooltip = TooltipHandler(translator) { isHeld(showOriginalKey) }
 
         val saver = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "ChatTranslator-cache").apply { isDaemon = true } }
         saver.scheduleWithFixedDelay({ cache.saveIfDirty() }, 60, 60, TimeUnit.SECONDS)

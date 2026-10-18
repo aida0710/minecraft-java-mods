@@ -10,14 +10,14 @@ import java.util.Optional
  * 毎フレーム呼ばれるため、未翻訳の行は原文のまま表示しつつ裏で翻訳を予約し、
  * キャッシュに入った時点で訳文に切り替わる。
  */
-class TooltipHandler(private val translator: Translator) {
+class TooltipHandler(private val translator: Translator, private val showOriginalHeld: () -> Boolean) {
     @Volatile var enabled = true
 
     private val identifier = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
 
     fun onTooltip(lines: MutableList<Component>) {
         val cfg = TranslatorConfig.current
-        if (!enabled || !cfg.tooltipEnabled) return
+        if (!enabled || !cfg.tooltipEnabled || showOriginalHeld()) return
 
         var i = 0
         while (i < lines.size) {
