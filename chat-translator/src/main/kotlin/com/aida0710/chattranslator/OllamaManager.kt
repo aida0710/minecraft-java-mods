@@ -2,6 +2,7 @@ package com.aida0710.chattranslator
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import net.minecraft.network.chat.Component
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -13,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Ollama の場合にモデルの有無を確認し、無ければ /api/pull で自動ダウンロードする。
  * Ollama 以外 (LM Studio など) のサーバーでは何もしない。
  */
-class OllamaManager(private val notify: (message: String, progress: Boolean) -> Unit) {
+class OllamaManager(private val notify: (message: Component, progress: Boolean) -> Unit) {
     enum class State { UNKNOWN, NOT_RUNNING, NOT_OLLAMA, MISSING, PULLING, READY, FAILED }
 
     @Volatile var state = State.UNKNOWN
@@ -28,7 +29,7 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
     /** バックグラウンドで確認 (と必要なら pull) を行う。実行中なら何もしない */
     fun checkAsync(cfg: TranslatorConfig.Values, forcePull: Boolean = false) {
         if (!busy.compareAndSet(false, true)) {
-            notify("モデルの確認/ダウンロードは既に実行中です", false)
+            notify(T.tr("ollama.busy"), false)
             return
         }
         Thread({
@@ -37,7 +38,7 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
             } catch (e: Exception) {
                 state = State.FAILED
                 ChatTranslator.LOGGER.warn("Ollama check failed", e)
-                notify("モデルの確認に失敗しました: ${e.message}", false)
+                notify(T.tr("ollama.check_failed", e.message ?: e.toString()), false)
             } finally {
                 busy.set(false)
             }
@@ -45,12 +46,12 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
     }
 
     private fun check(cfg: TranslatorConfig.Values, forcePull: Boolean) {
-        val base = baseUrl(cfg.endpoint)
+        val base = baseUrl(cfg.openaiEndpoint)
         val version = try {
             get("$base/api/version")
         } catch (e: java.io.IOException) {
             state = State.NOT_RUNNING
-            notify("LLM サーバー (${cfg.endpoint}) に接続できません。Ollama などを起動してください", false)
+            notify(T.tr("ollama.not_running", cfg.openaiEndpoint), false)
             return
         }
         if (version.statusCode() != 200 || !version.body().contains("\"version\"")) {
@@ -58,17 +59,17 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
             return
         }
 
-        if (!forcePull && hasModel(base, cfg.model)) {
+        if (!forcePull && hasModel(base, cfg.openaiModel)) {
             state = State.READY
-            ChatTranslator.LOGGER.info("Ollama model {} is available", cfg.model)
+            ChatTranslator.LOGGER.info("Ollama model {} is available", cfg.openaiModel)
             return
         }
         state = State.MISSING
         if (!cfg.autoPull && !forcePull) {
-            notify("モデル ${cfg.model} が Ollama にありません。/chattranslator pull でダウンロードできます", false)
+            notify(T.tr("ollama.missing", cfg.openaiModel), false)
             return
         }
-        pull(base, cfg.model)
+        pull(base, cfg.openaiModel)
     }
 
     private fun hasModel(base: String, model: String): Boolean {
@@ -81,7 +82,7 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
 
     private fun pull(base: String, model: String) {
         state = State.PULLING
-        notify("翻訳モデル $model をダウンロードしています… (初回のみ。完了まで翻訳は行われません)", false)
+        notify(T.tr("ollama.pulling", model), false)
         val body = JsonObject().apply {
             addProperty("model", model)
             addProperty("stream", true)
@@ -107,7 +108,7 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
                     val percent = (completed * 100 / total).toInt()
                     if (percent != lastPercent) {
                         lastPercent = percent
-                        notify("$model をダウンロード中: $percent% (${completed.mb()} / ${total.mb()} MB)", true)
+                        notify(T.tr("download.progress", model, percent, completed.mb(), total.mb()), true)
                     }
                 }
                 if (status == "success") success = true
@@ -115,7 +116,7 @@ class OllamaManager(private val notify: (message: String, progress: Boolean) -> 
         }
         if (!success) throw IllegalStateException("pull did not finish")
         state = State.READY
-        notify("翻訳モデル $model の準備ができました", false)
+        notify(T.tr("ollama.ready", model), false)
     }
 
     private fun Long.mb() = this / 1_000_000

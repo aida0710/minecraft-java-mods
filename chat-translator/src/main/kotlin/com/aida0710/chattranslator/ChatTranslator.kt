@@ -1,15 +1,8 @@
 package com.aida0710.chattranslator
 
-import com.mojang.blaze3d.platform.InputConstants
-import com.mojang.brigadier.CommandDispatcher
-import com.mojang.brigadier.arguments.IntegerArgumentType
 import net.minecraft.ChatFormatting
-import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
-import net.minecraft.commands.CommandSourceStack
-import net.minecraft.commands.Commands
 import net.minecraft.network.chat.Component
-import net.minecraft.resources.Identifier
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent
 import net.minecraftforge.client.event.RegisterClientCommandsEvent
@@ -34,33 +27,44 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
     companion object {
         const val MODID = "chattranslator"
         @JvmField val LOGGER: Logger = LoggerFactory.getLogger("ChatTranslator")
+
+        private val TOGGLE_TOAST = net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId(2000L)
+
+        /** 設定画面などから各機能に触るための入口 */
+        lateinit var instance: ChatTranslator
+            private set
     }
 
-    private val dataDir = FMLPaths.CONFIGDIR.get().resolve(MODID)
-    private val glossary = Glossary(dataDir.resolve("glossary.json"))
-    private val itemNames = ItemNames(dataDir.resolve("skyblock_items.json"))
-    private lateinit var cache: TranslationCache
-    private lateinit var translator: Translator
-    private lateinit var chat: ChatHandler
-    private lateinit var tooltip: TooltipHandler
-    private var selfTest: SelfTest? = null
-    private val notices = ConcurrentLinkedQueue<Pair<String, Boolean>>()
-    private val ollama = OllamaManager { message, progress -> queueNotice(message, progress) }
-    private val llama = LlamaServerManager(dataDir.resolve("llama")) { message, progress -> queueNotice(message, progress) }
+    val dataDir = FMLPaths.CONFIGDIR.get().resolve(MODID)!!
+    val itemNames = ItemNames(dataDir.resolve("skyblock_items.json"))
+    val dictionaries = Dictionaries(dataDir.resolve("dictionaries"), itemNames)
+    val cache = TranslationCache(dataDir.resolve("cache.json"))
+    val ollama = OllamaManager { message, progress -> queueNotice(message, progress) }
+    val llama = LlamaServerManager(dataDir.resolve("llama")) { message, progress -> queueNotice(message, progress) }
+    lateinit var translator: Translator
+        private set
+    lateinit var chat: ChatHandler
+        private set
+    lateinit var tooltip: TooltipHandler
+        private set
+    val keys = Keybinds(this)
 
-    private val category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MODID, "main"))
-    private val toggleChatKey = KeyMapping("key.chattranslator.toggle_chat", InputConstants.UNKNOWN.value, category)
-    private val toggleTooltipKey = KeyMapping("key.chattranslator.toggle_tooltip", InputConstants.UNKNOWN.value, category)
-    private val showOriginalKey = KeyMapping("key.chattranslator.show_original", InputConstants.KEY_J, category)
+    private var selfTest: SelfTest? = null
+    private val notices = ConcurrentLinkedQueue<Pair<Component, Boolean>>()
+    /** 未設定の案内を 1 セッションに 1 回だけ出す */
+    private var notifiedNotReady = false
 
     init {
+        instance = this
         context.registerConfig(ModConfig.Type.CLIENT, TranslatorConfig.SPEC)
         val modBus = context.modBusGroup
         ModConfigEvent.Loading.getBus(modBus).addListener { if (it.config.modId == MODID) onConfigLoaded() }
         ModConfigEvent.Reloading.getBus(modBus).addListener { if (it.config.modId == MODID) TranslatorConfig.reload() }
+        SettingsScreen.registerConfigButton(context)
 
-        RegisterKeyMappingsEvent.BUS.addListener { it.register(toggleChatKey); it.register(toggleTooltipKey); it.register(showOriginalKey) }
-        RegisterClientCommandsEvent.BUS.addListener { registerCommands(it.dispatcher) }
+        RegisterKeyMappingsEvent.BUS.addListener { keys.register(it) }
+        RegisterClientCommandsEvent.BUS.addListener { Commands.register(it.dispatcher, this) }
+        keys.registerScreenListener()
 
         // Hypixel はプレイヤー発言も含めほぼ全てシステムメッセージとして送ってくる。
         // 元メッセージはキャンセルせず、必要なら差し替えるだけ
@@ -75,31 +79,38 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
             if (ev !is ClientChatReceivedEvent.Player && ready()) chat.onMessage(ev.message, isSystem = false)?.let { ev.message = it }
         })
         ClientPlayerNetworkEvent.LoggingIn.BUS.addListener(Consumer { onLoggedIn() })
+        ClientPlayerNetworkEvent.LoggingOut.BUS.addListener(Consumer { onLoggedOut() })
         ItemTooltipEvent.BUS.addListener(Consumer { if (ready()) tooltip.onTooltip(it.toolTip) })
         TickEvent.ClientTickEvent.Post.BUS.addListener(Consumer { onClientTick() })
     }
 
-    private fun ready() = ::translator.isInitialized
-
-    /** インベントリ画面中は KeyMapping の状態が更新されないため、キーボードの生の状態を見る */
-    private fun isHeld(key: KeyMapping): Boolean {
-        val k = key.key
-        return k.type == InputConstants.Type.KEYBOARD && k.value > 0 && InputConstants.isKeyDown(k.value)
-    }
+    fun ready() = ::translator.isInitialized
 
     private fun onConfigLoaded() {
         TranslatorConfig.reload()
         if (ready()) return
-        glossary.load()
-        itemNames.setExtra(glossary.keep)
-        cache = TranslationCache(dataDir.resolve("cache.json"), TranslatorConfig.current.maxCacheEntries).also { it.load() }
-        translator = Translator(LlmClient { llama.endpoint }, cache, glossary, itemNames)
-        itemNames.loadAsync(TranslatorConfig.current.protectItemNames)
+        val cfg = TranslatorConfig.current
+        cache.maxEntries = cfg.maxCacheEntries
+        cache.persist = cfg.cachePersist
+        cache.load()
+        dictionaries.load()
+        translator = Translator(
+            mapOf(
+                ProviderType.BUILTIN to BuiltinProvider({ llama.endpoint }, { llama.isInstalled(TranslatorConfig.current) }),
+                ProviderType.OPENAI_COMPATIBLE to OpenAiCompatibleProvider(),
+                ProviderType.CLAUDE to ClaudeProvider(),
+                ProviderType.DEEPL to DeepLProvider(),
+                ProviderType.GOOGLE to GoogleProvider(),
+            ),
+            cache, dictionaries, itemNames,
+        )
         chat = ChatHandler(translator)
         LOGGER.info("Chat replace mode available: {}", chat.canReplace)
-        tooltip = TooltipHandler(translator) { isHeld(showOriginalKey) }
+        tooltip = TooltipHandler(translator) { keys.showOriginal() }
+        llama.refresh(cfg)
+        TranslatorConfig.onChange(::onSettingsChanged)
         System.getProperty("chattranslator.selftest")?.let { dir ->
-            selfTest = SelfTest(java.nio.file.Path.of(dir), chat) { llama.endpoint != null || TranslatorConfig.current.backendMode == BackendMode.EXTERNAL }
+            selfTest = SelfTest(java.nio.file.Path.of(dir), chat) { translator.isReady() }
             LOGGER.warn("SELFTEST enabled: {}", dir)
         }
 
@@ -109,27 +120,56 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
             translator.shutdown()
             llama.stop()
         }, "ChatTranslator-shutdown"))
+        LOGGER.info("ChatTranslator ready: provider={} model={} cache={} entries", cfg.provider, cfg.modelKey, cache.size())
+    }
+
+    private var lastProvider: ProviderType? = null
+
+    /** 設定画面などで値が変わったときに各部へ反映する */
+    private fun onSettingsChanged(cfg: TranslatorConfig.Values) {
+        if (!ready()) return
+        cache.maxEntries = cfg.maxCacheEntries
+        if (cache.persist != cfg.cachePersist) {
+            cache.persist = cfg.cachePersist
+            cache.markDirty()
+            cache.saveIfDirty()
+        }
+        dictionaries.apply()
+        llama.refresh(cfg)
+        if (lastProvider != null && lastProvider != cfg.provider) {
+            // 内蔵 LLM 以外に切り替えたら VRAM を空ける
+            if (cfg.provider != ProviderType.BUILTIN) llama.stop()
+            else if (Minecraft.getInstance().player != null) llama.startAsync(cfg)
+            notifiedNotReady = false
+        }
+        lastProvider = cfg.provider
+    }
+
+    /** ワールド/サーバーに入ったときに翻訳エンジンを起動する (ゲーム起動時は何もしないので軽い) */
+    private fun onLoggedIn() {
+        if (!ready()) return
         val cfg = TranslatorConfig.current
-        LOGGER.info("ChatTranslator ready: backend={} model={} cache={} entries", cfg.backendMode, cfg.modelKey, cache.size())
-        startBackend(cfg)
+        lastProvider = cfg.provider
+        when (cfg.provider) {
+            ProviderType.BUILTIN -> llama.startAsync(cfg)
+            ProviderType.OPENAI_COMPATIBLE -> ollama.checkAsync(cfg)
+            else -> {}
+        }
+        val notReady = if (cfg.provider == ProviderType.BUILTIN) !llama.isInstalled(cfg) else !translator.isReady(cfg)
+        if (notReady && !notifiedNotReady) {
+            notifiedNotReady = true
+            queueNotice(translator.notReadyReason(cfg), false)
+        }
     }
 
-    private fun startBackend(cfg: TranslatorConfig.Values) = when (cfg.backendMode) {
-        // llama.cpp とモデルを自動ダウンロードして起動
-        BackendMode.BUILTIN -> llama.startAsync(cfg)
-        // 外部サーバー: Ollama なら未取得時に自動 pull
-        BackendMode.EXTERNAL -> ollama.checkAsync(cfg)
+    private fun onLoggedOut() {
+        // 遊んでいない間は VRAM を使わない
+        if (ready()) llama.stop()
     }
-
-    private fun backendStatus(cfg: TranslatorConfig.Values) = when (cfg.backendMode) {
-        BackendMode.BUILTIN -> "builtin/${cfg.gpuBackend} ${llama.state}"
-        BackendMode.EXTERNAL -> "external ${cfg.endpoint} ${ollama.state}"
-    }
-
 
     /** 任意のスレッドから呼べる。ワールド参加前ならログだけ残し、参加後にチャットへ出す */
-    private fun queueNotice(message: String, progress: Boolean) {
-        if (!progress) LOGGER.info(message)
+    fun queueNotice(message: Component, progress: Boolean) {
+        if (!progress) LOGGER.info(message.string)
         notices.add(message to progress)
     }
 
@@ -142,23 +182,8 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         }
         while (true) {
             val (message, progress) = notices.poll() ?: break
-            val component = Component.literal("[ChatTranslator] $message").withStyle(ChatFormatting.AQUA)
+            val component = Component.literal("[ChatTranslator] ").append(message).withStyle(ChatFormatting.AQUA)
             if (progress) mc.gui.hud.setOverlayMessage(component, false) else mc.gui.hud.chat.addClientSystemMessage(component)
-        }
-    }
-
-    private fun onLoggedIn() {
-        if (!ready()) return
-        val cfg = TranslatorConfig.current
-        when (cfg.backendMode) {
-            BackendMode.BUILTIN -> when (llama.state) {
-                LlamaServerManager.State.FAILED -> llama.startAsync(cfg)
-                LlamaServerManager.State.DOWNLOADING, LlamaServerManager.State.STARTING ->
-                    queueNotice("翻訳エンジンを準備中です。完了するまで原文のまま表示されます", false)
-                else -> {}
-            }
-            // 起動時に LLM が落ちていた場合などに備えて再確認
-            BackendMode.EXTERNAL -> if (ollama.state in setOf(OllamaManager.State.NOT_RUNNING, OllamaManager.State.FAILED)) ollama.checkAsync(cfg)
         }
     }
 
@@ -166,72 +191,34 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         if (!ready()) return
         flushNotices()
         selfTest?.onTick()
-        while (toggleChatKey.consumeClick()) {
-            chat.enabled = !chat.enabled
-            notify("チャット翻訳", chat.enabled)
-        }
-        while (toggleTooltipKey.consumeClick()) {
-            tooltip.enabled = !tooltip.enabled
-            notify("ツールチップ翻訳", tooltip.enabled)
-        }
+        keys.onTick()
     }
 
-    private fun notify(label: String, on: Boolean) {
-        Minecraft.getInstance().gui.hud.chat.addClientSystemMessage(
-            Component.literal("[ChatTranslator] $label: ").withStyle(ChatFormatting.AQUA)
-                .append(Component.literal(if (on) "ON" else "OFF").withStyle(if (on) ChatFormatting.GREEN else ChatFormatting.RED)),
-        )
+    /** ON/OFF 切り替えの結果を画面下部に表示する */
+    fun showToggle(label: Component, on: Boolean) {
+        val mc = Minecraft.getInstance()
+        val component = Component.literal("[ChatTranslator] ").append(label).append(": ").withStyle(ChatFormatting.AQUA)
+            .append(T.onOff(on).withStyle(if (on) ChatFormatting.GREEN else ChatFormatting.RED))
+        // インベントリなどの画面を開いているとアクションバーは隠れるので、トーストで知らせる
+        if (mc.gui.screen() != null) {
+            net.minecraft.client.gui.components.toasts.SystemToast.addOrUpdate(
+                mc.gui.toastManager(), TOGGLE_TOAST, Component.literal("Chat Translator"),
+                label.copy().append(": ").append(T.onOff(on).withStyle(if (on) ChatFormatting.GREEN else ChatFormatting.RED)),
+            )
+        } else if (mc.player != null) mc.gui.hud.setOverlayMessage(component, false)
     }
 
-    private fun registerCommands(dispatcher: CommandDispatcher<CommandSourceStack>) {
-        fun reply(src: CommandSourceStack, text: String) = src.sendSystemMessage(Component.literal("[ChatTranslator] $text").withStyle(ChatFormatting.AQUA))
-
-        dispatcher.register(
-            Commands.literal("chattranslator")
-                .then(Commands.literal("status").executes { ctx ->
-                    val c = TranslatorConfig.current
-                    reply(ctx.source, "chat=${chat.enabled && c.chatEnabled} (${c.chatDisplayMode}) tooltip=${tooltip.enabled && c.tooltipEnabled} model=${c.modelKey} backend=${backendStatus(c)} cache=${cache.size()}")
-                    1
-                })
-                .then(Commands.literal("swap").then(Commands.argument("id", IntegerArgumentType.integer(0)).executes { ctx ->
-                    // チャットの [原文] / [訳] ボタンから実行される
-                    if (!chat.swap(IntegerArgumentType.getInteger(ctx, "id"))) reply(ctx.source, "このメッセージは古いため切り替えられません")
-                    1
-                }))
-                .then(Commands.literal("pull").executes { ctx ->
-                    val c = TranslatorConfig.current
-                    if (c.backendMode == BackendMode.BUILTIN) {
-                        reply(ctx.source, "内蔵サーバーを再起動します (未ダウンロードのファイルがあれば取得します)")
-                        llama.stop()
-                        llama.startAsync(c)
-                    } else {
-                        reply(ctx.source, "${c.model} を確認/ダウンロードします")
-                        ollama.checkAsync(c, forcePull = true)
-                    }
-                    1
-                })
-                .then(Commands.literal("reload").executes { ctx ->
-                    glossary.load()
-                    itemNames.setExtra(glossary.keep)
-                    reply(ctx.source, "glossary.json を再読み込みしました")
-                    1
-                })
-                .then(Commands.literal("clearcache").executes { ctx ->
-                    translator.clearCache()
-                    cache.saveIfDirty()
-                    reply(ctx.source, "翻訳キャッシュを削除しました")
-                    1
-                })
-                .then(Commands.literal("test").then(Commands.argument("text", com.mojang.brigadier.arguments.StringArgumentType.greedyString()).executes { ctx ->
-                    val text = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "text")
-                    val mc = Minecraft.getInstance()
-                    translator.translateChat(
-                        text,
-                        onSuccess = { tr -> mc.execute { reply(ctx.source, "$text → $tr") } },
-                        onFailure = { mc.execute { reply(ctx.source, "翻訳に失敗しました。LLM サーバーの起動とモデル名を確認してください (ログに詳細)") } },
-                    )
-                    1
-                })),
-        )
+    /** 状態表示用 */
+    fun engineStatus(cfg: TranslatorConfig.Values = TranslatorConfig.current): Component = when (cfg.provider) {
+        ProviderType.BUILTIN -> when (llama.state) {
+            LlamaServerManager.State.NOT_INSTALLED -> T.tr("status.not_installed")
+            LlamaServerManager.State.INSTALLING -> T.tr("status.installing", (llama.progressFraction * 100).toInt())
+            LlamaServerManager.State.STOPPED -> T.tr("status.installed")
+            LlamaServerManager.State.STARTING -> T.tr("status.starting")
+            LlamaServerManager.State.READY -> T.tr("status.running")
+            LlamaServerManager.State.FAILED -> T.tr("status.error", llama.lastError ?: "?")
+        }
+        ProviderType.OPENAI_COMPATIBLE -> Component.literal("${cfg.openaiEndpoint} (${ollama.state})")
+        else -> T.tr(if (translator.isReady(cfg)) "status.key_set" else "status.key_missing")
     }
 }

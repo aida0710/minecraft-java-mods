@@ -4,10 +4,10 @@ import net.minecraftforge.common.ForgeConfigSpec
 
 enum class ChatDisplayMode { REPLACE, APPEND }
 
-/** BUILTIN: llama.cpp を mod が自動で導入・起動 / EXTERNAL: 自分で立てた OpenAI 互換サーバー (Ollama など) を使う */
-enum class BackendMode { BUILTIN, EXTERNAL }
-
-/** config/chattranslator-client.toml の定義。読み込み/リロードのたびに [current] を差し替える。 */
+/**
+ * config/chattranslator-client.toml の定義。読み込み/リロード/変更のたびに [current] を差し替える。
+ * 設定画面からは [update] で値を書き換える (即保存)。
+ */
 object TranslatorConfig {
     data class Values(
         val chatEnabled: Boolean,
@@ -17,13 +17,12 @@ object TranslatorConfig {
         val tooltipTranslateItemName: Boolean,
         val tooltipShowOriginal: Boolean,
         val minLength: Int,
-        val sourceLang: String,
         val sourceCode: String,
-        val targetLang: String,
         val targetCode: String,
+        val provider: ProviderType,
         val temperature: Double,
         val timeoutSeconds: Int,
-        val backendMode: BackendMode,
+        val llmContext: String,
         // builtin
         val llamaBuild: String,
         val gpuBackend: GpuBackend,
@@ -33,30 +32,47 @@ object TranslatorConfig {
         val builtinContextSize: Int,
         val builtinPort: Int,
         val builtinExtraArgs: String,
-        // external
-        val endpoint: String,
-        val model: String,
-        val apiKey: String,
-        val systemPrompt: String,
-        val promptTemplate: String,
+        // openai compatible
+        val openaiEndpoint: String,
+        val openaiModel: String,
+        val openaiApiKey: String,
+        val openaiSystemPrompt: String,
+        val openaiUsePromptTemplate: Boolean,
+        val openaiPromptTemplate: String,
         val autoPull: Boolean,
-        val protectItemNames: Boolean,
+        // cloud
+        val claudeApiKey: String,
+        val claudeModel: String,
+        val deeplApiKey: String,
+        val googleApiKey: String,
+        // cache
+        val cachePersist: Boolean,
         val maxCacheEntries: Int,
+        // dictionaries
+        val enabledDictionaries: List<String>,
     ) {
-        /** キャッシュのキーに使うモデル識別子 (モデルを変えたら訳し直すため) */
+        /** キャッシュのキーに使う識別子 (エンジン・モデル・言語を変えたら訳し直す) */
         val modelKey: String
-            get() = if (backendMode == BackendMode.BUILTIN) modelUrl.substringAfterLast('/') else model
+            get() {
+                val model = when (provider) {
+                    ProviderType.BUILTIN -> modelUrl.substringAfterLast('/')
+                    ProviderType.OPENAI_COMPATIBLE -> openaiModel
+                    ProviderType.CLAUDE -> claudeModel
+                    ProviderType.DEEPL, ProviderType.GOOGLE -> ""
+                }
+                return "$provider:$model:$sourceCode>$targetCode"
+            }
 
-        fun buildPrompt(text: String): String = promptTemplate
+        fun buildPrompt(text: String): String = openaiPromptTemplate
             .replace("\\n", "\n")
-            .replace("{source_lang}", sourceLang)
+            .replace("{source_lang}", Languages.englishName(sourceCode))
             .replace("{source_code}", sourceCode)
-            .replace("{target_lang}", targetLang)
+            .replace("{target_lang}", Languages.englishName(targetCode))
             .replace("{target_code}", targetCode)
             .replace("{text}", text)
     }
 
-    /** TranslateGemma の公式プロンプト形式 (本文の前に空行2つ)。Ollama 等で使う */
+    /** TranslateGemma の公式プロンプト形式 (本文の前に空行2つ)。Ollama の translategemma で使う */
     const val TRANSLATEGEMMA_PROMPT =
         "You are a professional {source_lang} ({source_code}) to {target_lang} ({target_code}) translator. " +
             "Your goal is to accurately convey the meaning and nuances of the original {source_lang} text " +
@@ -66,39 +82,47 @@ object TranslatorConfig {
 
     const val DEFAULT_MODEL_URL = "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf"
     const val DEFAULT_MODEL_SHA256 = "81200d03e843d2ec1ece6eeafe7d13cb6e5211e1fcd336ade55790b683a08330"
+    const val DEFAULT_LLM_CONTEXT =
+        "The text comes from Minecraft multiplayer chat and item tooltips. Keep player names, numbers, and symbols unchanged, " +
+            "and translate gaming slang naturally."
 
     private val b = ForgeConfigSpec.Builder()
 
-    private val chatEnabled: ForgeConfigSpec.BooleanValue
-    private val chatDisplayMode: ForgeConfigSpec.EnumValue<ChatDisplayMode>
-    private val chatSystem: ForgeConfigSpec.BooleanValue
-    private val tooltipEnabled: ForgeConfigSpec.BooleanValue
-    private val tooltipItemName: ForgeConfigSpec.BooleanValue
-    private val tooltipShowOriginal: ForgeConfigSpec.BooleanValue
-    private val minLength: ForgeConfigSpec.IntValue
-    private val sourceLang: ForgeConfigSpec.ConfigValue<String>
-    private val sourceCode: ForgeConfigSpec.ConfigValue<String>
-    private val targetLang: ForgeConfigSpec.ConfigValue<String>
-    private val targetCode: ForgeConfigSpec.ConfigValue<String>
-    private val temperature: ForgeConfigSpec.DoubleValue
-    private val timeout: ForgeConfigSpec.IntValue
-    private val backendMode: ForgeConfigSpec.EnumValue<BackendMode>
-    private val llamaBuild: ForgeConfigSpec.ConfigValue<String>
-    private val gpuBackend: ForgeConfigSpec.EnumValue<GpuBackend>
-    private val modelUrl: ForgeConfigSpec.ConfigValue<String>
-    private val modelSha256: ForgeConfigSpec.ConfigValue<String>
-    private val gpuLayers: ForgeConfigSpec.IntValue
-    private val contextSize: ForgeConfigSpec.IntValue
-    private val port: ForgeConfigSpec.IntValue
-    private val extraArgs: ForgeConfigSpec.ConfigValue<String>
-    private val endpoint: ForgeConfigSpec.ConfigValue<String>
-    private val model: ForgeConfigSpec.ConfigValue<String>
-    private val apiKey: ForgeConfigSpec.ConfigValue<String>
-    private val systemPrompt: ForgeConfigSpec.ConfigValue<String>
-    private val promptTemplate: ForgeConfigSpec.ConfigValue<String>
-    private val autoPull: ForgeConfigSpec.BooleanValue
-    private val protectItemNames: ForgeConfigSpec.BooleanValue
-    private val maxCache: ForgeConfigSpec.IntValue
+    val chatEnabled: ForgeConfigSpec.BooleanValue
+    val chatDisplayMode: ForgeConfigSpec.EnumValue<ChatDisplayMode>
+    val chatSystem: ForgeConfigSpec.BooleanValue
+    val tooltipEnabled: ForgeConfigSpec.BooleanValue
+    val tooltipItemName: ForgeConfigSpec.BooleanValue
+    val tooltipShowOriginal: ForgeConfigSpec.BooleanValue
+    val minLength: ForgeConfigSpec.IntValue
+    val sourceCode: ForgeConfigSpec.ConfigValue<String>
+    val targetCode: ForgeConfigSpec.ConfigValue<String>
+    val provider: ForgeConfigSpec.EnumValue<ProviderType>
+    val temperature: ForgeConfigSpec.DoubleValue
+    val timeout: ForgeConfigSpec.IntValue
+    val llmContext: ForgeConfigSpec.ConfigValue<String>
+    val llamaBuild: ForgeConfigSpec.ConfigValue<String>
+    val gpuBackend: ForgeConfigSpec.EnumValue<GpuBackend>
+    val modelUrl: ForgeConfigSpec.ConfigValue<String>
+    val modelSha256: ForgeConfigSpec.ConfigValue<String>
+    val gpuLayers: ForgeConfigSpec.IntValue
+    val contextSize: ForgeConfigSpec.IntValue
+    val port: ForgeConfigSpec.IntValue
+    val extraArgs: ForgeConfigSpec.ConfigValue<String>
+    val openaiEndpoint: ForgeConfigSpec.ConfigValue<String>
+    val openaiModel: ForgeConfigSpec.ConfigValue<String>
+    val openaiApiKey: ForgeConfigSpec.ConfigValue<String>
+    val openaiSystemPrompt: ForgeConfigSpec.ConfigValue<String>
+    val openaiUsePromptTemplate: ForgeConfigSpec.BooleanValue
+    val openaiPromptTemplate: ForgeConfigSpec.ConfigValue<String>
+    val autoPull: ForgeConfigSpec.BooleanValue
+    val claudeApiKey: ForgeConfigSpec.ConfigValue<String>
+    val claudeModel: ForgeConfigSpec.ConfigValue<String>
+    val deeplApiKey: ForgeConfigSpec.ConfigValue<String>
+    val googleApiKey: ForgeConfigSpec.ConfigValue<String>
+    val cachePersist: ForgeConfigSpec.BooleanValue
+    val maxCache: ForgeConfigSpec.IntValue
+    val enabledDictionaries: ForgeConfigSpec.ConfigValue<MutableList<out String>>
 
     val SPEC: ForgeConfigSpec
 
@@ -114,7 +138,7 @@ object TranslatorConfig {
 
         b.push("tooltip")
         tooltipEnabled = b.comment("アイテムのツールチップ (説明文) を翻訳する").define("enabled", true)
-        tooltipItemName = b.comment("アイテム名 (1行目) も翻訳する").define("translateItemName", true)
+        tooltipItemName = b.comment("アイテム名 (1行目) も翻訳する (辞書で保護されたアイテム名は英語のまま)").define("translateItemName", true)
         tooltipShowOriginal = b.comment("訳文の下に原文も残す").define("showOriginal", false)
         b.pop()
 
@@ -123,19 +147,21 @@ object TranslatorConfig {
         b.pop()
 
         b.push("language")
-        sourceLang = b.define("sourceLang", "English")
-        sourceCode = b.define("sourceCode", "en")
-        targetLang = b.define("targetLang", "Japanese")
-        targetCode = b.define("targetCode", "ja")
+        sourceCode = b.comment("翻訳元の言語コード (auto = 自動検出。内蔵 LLM では英語として扱う)").define("source", "en")
+        targetCode = b.comment("翻訳先の言語コード").define("target", "ja")
         b.pop()
 
-        b.push("backend")
-        backendMode = b.comment(
-            "BUILTIN:  llama.cpp とモデルを mod が自動でダウンロードし、ゲーム起動中だけ動かす (おすすめ)",
-            "EXTERNAL: 自分で起動した OpenAI 互換サーバー (Ollama / LM Studio など) を使う。[external] を設定",
-        ).defineEnum("mode", BackendMode.BUILTIN)
+        b.push("engine")
+        provider = b.comment(
+            "BUILTIN:           内蔵 LLM (設定画面からインストール。ゲーム中だけ動く)",
+            "OPENAI_COMPATIBLE: Ollama / LM Studio / OpenAI / Gemini / OpenRouter など",
+            "CLAUDE:            Anthropic Claude API",
+            "DEEPL:             DeepL API",
+            "GOOGLE:            Google Cloud Translation API",
+        ).defineEnum("provider", ProviderType.BUILTIN)
         temperature = b.defineInRange("temperature", 0.0, 0.0, 2.0)
         timeout = b.comment("1リクエストのタイムアウト秒").defineInRange("timeoutSeconds", 30, 1, 600)
+        llmContext = b.comment("LLM (Claude / OpenAI 互換) への追加の指示").define("llmContext", DEFAULT_LLM_CONTEXT)
         b.pop()
 
         b.push("builtin")
@@ -146,42 +172,58 @@ object TranslatorConfig {
             "CPU:    GPU を使わない (遅い)",
             "※ macOS は設定に関わらず Metal 版を使う",
         ).defineEnum("gpu", GpuBackend.VULKAN)
-        modelUrl = b.comment(
-            "GGUF モデルのダウンロード URL (品質重視なら translategemma-12b-it の GGUF。VRAM 10GB 以上推奨)",
-        ).define("modelUrl", DEFAULT_MODEL_URL)
-        modelSha256 = b.comment("モデルの SHA-256 (空なら検証しない。modelUrl を変えたら空にするか正しい値に)").define("modelSha256", DEFAULT_MODEL_SHA256)
-        llamaBuild = b.comment("llama.cpp のリリースタグ (https://github.com/ggml-org/llama.cpp/releases)").define("llamaBuild", "b11719")
+        modelUrl = b.comment("GGUF モデルのダウンロード URL").define("modelUrl", DEFAULT_MODEL_URL)
+        modelSha256 = b.comment("モデルの SHA-256 (空なら検証しない)").define("modelSha256", DEFAULT_MODEL_SHA256)
+        llamaBuild = b.comment("llama.cpp のリリースタグ").define("llamaBuild", "b11719")
         gpuLayers = b.comment("GPU に載せる層数 (99 = 全部)").defineInRange("gpuLayers", 99, 0, 999)
         contextSize = b.defineInRange("contextSize", 4096, 512, 131072)
-        port = b.comment("待ち受けポート (0 = 空いているポートを自動選択)").defineInRange("port", 0, 0, 65535)
+        port = b.comment("待ち受けポート (0 = 自動)").defineInRange("port", 0, 0, 65535)
         extraArgs = b.comment("llama-server に追加で渡す引数 (空白区切り)").define("extraArgs", "")
         b.pop()
 
-        b.push("external")
-        endpoint = b.comment(
+        b.push("openai")
+        openaiEndpoint = b.comment(
             "OpenAI 互換 API のベース URL",
-            "  Ollama:    http://localhost:11434/v1",
-            "  LM Studio: http://localhost:1234/v1",
-            "  llama.cpp: http://localhost:8080/v1",
+            "  Ollama:     http://localhost:11434/v1",
+            "  LM Studio:  http://localhost:1234/v1",
+            "  OpenAI:     https://api.openai.com/v1",
+            "  Gemini:     https://generativelanguage.googleapis.com/v1beta/openai",
+            "  OpenRouter: https://openrouter.ai/api/v1",
         ).define("endpoint", "http://localhost:11434/v1")
-        model = b.comment("モデル名 (例: translategemma:4b, translategemma:12b)").define("model", "translategemma:4b")
-        apiKey = b.comment("API キー (ローカルなら空でよい)").define("apiKey", "")
-        systemPrompt = b.comment("システムプロンプト (TranslateGemma では空推奨)").define("systemPrompt", "")
-        promptTemplate = b.comment(
-            "ユーザープロンプト。{source_lang} {source_code} {target_lang} {target_code} {text} が置換され、\\n は改行になる",
+        openaiModel = b.comment("モデル名").define("model", "translategemma:4b")
+        openaiApiKey = b.comment("API キー (ローカルなら空でよい)").define("apiKey", "")
+        openaiSystemPrompt = b.comment("システムプロンプト (空なら自動)").define("systemPrompt", "")
+        openaiUsePromptTemplate = b.comment(
+            "true: 下の promptTemplate で本文を包んで送る (Ollama の translategemma など翻訳専用モデル向け)",
+            "false: 指示はシステムプロンプトで渡し、本文だけ送る (GPT / Gemini など汎用モデル向け)",
+        ).define("usePromptTemplate", true)
+        openaiPromptTemplate = b.comment(
+            "{source_lang} {source_code} {target_lang} {target_code} {text} が置換され、\\n は改行になる",
         ).define("promptTemplate", TRANSLATEGEMMA_PROMPT)
-        autoPull = b.comment("Ollama 使用時、モデルが未ダウンロードなら起動時に自動で pull する").define("autoPull", true)
+        autoPull = b.comment("Ollama の場合、モデルが無ければ自動で pull する").define("autoPull", true)
         b.pop()
 
-        b.push("skyblock")
-        protectItemNames = b.comment(
-            "Hypixel SkyBlock のアイテム名 (公開 API から取得) を翻訳せず英語のまま残す",
-            "ツールチップのアイテム名行は英語のまま、文中のアイテム名も英語で残す",
-        ).define("protectItemNames", true)
+        b.push("claude")
+        claudeApiKey = b.comment("Anthropic API キー (https://platform.claude.com)").define("apiKey", "")
+        claudeModel = b.comment("モデル ID (例: claude-haiku-5-5, claude-sonnet-5-5)").define("model", "claude-haiku-5-5")
+        b.pop()
+
+        b.push("deepl")
+        deeplApiKey = b.comment("DeepL API キー (無料版は末尾が :fx)").define("apiKey", "")
+        b.pop()
+
+        b.push("google")
+        googleApiKey = b.comment("Google Cloud Translation API キー").define("apiKey", "")
         b.pop()
 
         b.push("cache")
-        maxCache = b.comment("翻訳キャッシュの最大件数 (再起動後に反映)").defineInRange("maxEntries", 20000, 100, 1_000_000)
+        cachePersist = b.comment("翻訳結果のキャッシュをファイルに保存し、次回起動時も使う (false ならゲーム終了で消える)").define("persist", true)
+        maxCache = b.comment("キャッシュの最大件数").defineInRange("maxEntries", 20000, 100, 1_000_000)
+        b.pop()
+
+        b.push("dictionaries")
+        enabledDictionaries = b.comment("有効な辞書 (config/chattranslator/dictionaries/<id>.json)")
+            .defineListAllowEmpty("enabled", listOf("hypixel-skyblock", "user")) { it is String }
         b.pop()
 
         SPEC = b.build()
@@ -190,8 +232,24 @@ object TranslatorConfig {
     @Volatile var current: Values = read(defaults = true)
         private set
 
+    private val listeners = mutableListOf<(Values) -> Unit>()
+
+    /** 設定が変わったときに呼ばれる */
+    fun onChange(listener: (Values) -> Unit) {
+        listeners += listener
+    }
+
     fun reload() {
         current = read(defaults = false)
+        listeners.forEach { it(current) }
+    }
+
+    /** 値を変更して即保存する (設定画面・キー操作・コマンドから) */
+    fun <T : Any> update(value: ForgeConfigSpec.ConfigValue<T>, newValue: T) {
+        if (value.get() == newValue) return
+        value.set(newValue)
+        value.save()
+        reload()
     }
 
     private fun read(defaults: Boolean): Values {
@@ -204,13 +262,12 @@ object TranslatorConfig {
             tooltipTranslateItemName = v(tooltipItemName),
             tooltipShowOriginal = v(tooltipShowOriginal),
             minLength = v(minLength),
-            sourceLang = v(sourceLang),
             sourceCode = v(sourceCode),
-            targetLang = v(targetLang),
             targetCode = v(targetCode),
+            provider = v(provider),
             temperature = v(temperature),
             timeoutSeconds = v(timeout),
-            backendMode = v(backendMode),
+            llmContext = v(llmContext),
             llamaBuild = v(llamaBuild),
             gpuBackend = v(gpuBackend),
             modelUrl = v(modelUrl),
@@ -219,14 +276,20 @@ object TranslatorConfig {
             builtinContextSize = v(contextSize),
             builtinPort = v(port),
             builtinExtraArgs = v(extraArgs),
-            endpoint = v(endpoint),
-            model = v(model),
-            apiKey = v(apiKey),
-            systemPrompt = v(systemPrompt),
-            promptTemplate = v(promptTemplate),
+            openaiEndpoint = v(openaiEndpoint),
+            openaiModel = v(openaiModel),
+            openaiApiKey = v(openaiApiKey),
+            openaiSystemPrompt = v(openaiSystemPrompt),
+            openaiUsePromptTemplate = v(openaiUsePromptTemplate),
+            openaiPromptTemplate = v(openaiPromptTemplate),
             autoPull = v(autoPull),
-            protectItemNames = v(protectItemNames),
+            claudeApiKey = v(claudeApiKey),
+            claudeModel = v(claudeModel),
+            deeplApiKey = v(deeplApiKey),
+            googleApiKey = v(googleApiKey),
+            cachePersist = v(cachePersist),
             maxCacheEntries = v(maxCache),
+            enabledDictionaries = v(enabledDictionaries).map { it },
         )
     }
 }

@@ -40,13 +40,13 @@ class OllamaManagerTest {
         var pulled = false
         val s = server("""{"name":"llama3:latest"}""") { pulled = true }
         try {
-            val notices = CopyOnWriteArrayList<String>()
-            val m = OllamaManager { msg, _ -> notices.add(msg) }
-            m.checkAsync(TranslatorConfig.current.copy(backendMode = BackendMode.EXTERNAL, endpoint = "http://127.0.0.1:${s.address.port}/v1"))
+            val notices = CopyOnWriteArrayList<Boolean>()
+            val m = OllamaManager { _, progress -> notices.add(progress) }
+            m.checkAsync(TranslatorConfig.current.copy(openaiEndpoint = "http://127.0.0.1:${s.address.port}/v1"))
             awaitIdle(m)
             assertEquals(OllamaManager.State.READY, m.state)
             assertTrue(pulled)
-            assertTrue(notices.any { it.contains("50%") }, notices.toString())
+            assertTrue(notices.any { it }, "progress notices: $notices")
         } finally {
             s.stop(0)
         }
@@ -58,7 +58,7 @@ class OllamaManagerTest {
         val s = server("""{"name":"translategemma:4b"}""") { pulled = true }
         try {
             val m = OllamaManager { _, _ -> }
-            m.checkAsync(TranslatorConfig.current.copy(backendMode = BackendMode.EXTERNAL, endpoint = "http://127.0.0.1:${s.address.port}/v1"))
+            m.checkAsync(TranslatorConfig.current.copy(openaiEndpoint = "http://127.0.0.1:${s.address.port}/v1"))
             awaitIdle(m)
             assertEquals(OllamaManager.State.READY, m.state)
             assertTrue(!pulled)
@@ -70,7 +70,7 @@ class OllamaManagerTest {
     @Test
     fun reportsServerNotRunning() {
         val m = OllamaManager { _, _ -> }
-        m.checkAsync(TranslatorConfig.current.copy(backendMode = BackendMode.EXTERNAL, endpoint = "http://127.0.0.1:1/v1"))
+        m.checkAsync(TranslatorConfig.current.copy(openaiEndpoint = "http://127.0.0.1:1/v1"))
         val deadline = System.currentTimeMillis() + 5000
         while (m.state == OllamaManager.State.UNKNOWN && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals(OllamaManager.State.NOT_RUNNING, m.state)

@@ -16,7 +16,6 @@ import java.util.Optional
  * キャッシュに入った時点で訳文に切り替わる。
  */
 class TooltipHandler(private val translator: Translator, private val showOriginalHeld: () -> Boolean) {
-    @Volatile var enabled = true
 
     private val identifier = Regex("^[a-z0-9_.-]+:[a-z0-9_/.-]+$")
 
@@ -37,14 +36,14 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
 
     fun onTooltip(lines: MutableList<Component>) {
         val cfg = TranslatorConfig.current
-        if (!enabled || !cfg.tooltipEnabled || showOriginalHeld() || lines.isEmpty()) return
+        if (!cfg.tooltipEnabled || showOriginalHeld() || lines.isEmpty()) return
 
         val parsed = lines.map { Line(it) }
         val out = ArrayList<Component>(lines.size + 4)
 
         // 1 行目はアイテム名。固有名詞なので既知の SkyBlock アイテムなら英語のまま
         val name = parsed[0]
-        val keepName = !cfg.tooltipTranslateItemName || (cfg.protectItemNames && translator.itemNames.isItemName(name.trimmed))
+        val keepName = !cfg.tooltipTranslateItemName || (translator.dictionaries.itemNamesActive && translator.itemNames.isItemName(name.trimmed))
         if (keepName || !isProse(name.trimmed, cfg)) out.add(name.component) else out.addAll(translateParagraph(listOf(name), cfg))
 
         var i = 1

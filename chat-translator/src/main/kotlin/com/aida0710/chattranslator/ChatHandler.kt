@@ -17,7 +17,6 @@ import java.util.Optional
  *  - APPEND:  原文の下に訳文を追加する。
  */
 class ChatHandler(private val translator: Translator) {
-    @Volatile var enabled = true
 
     /** 切り替え用に原文と訳文を保持する。描画スレッドからのみ触る */
     private class Entry(val original: Component, val translated: Component, var current: Component)
@@ -39,7 +38,7 @@ class ChatHandler(private val translator: Translator) {
      */
     fun onMessage(message: Component, isSystem: Boolean): Component? {
         val cfg = TranslatorConfig.current
-        if (!enabled || !cfg.chatEnabled) return null
+        if (!cfg.chatEnabled) return null
         if (isSystem && !cfg.chatTranslateSystemMessages) return null
 
         val raw = TextUtil.stripFormatting(message.string)
@@ -56,13 +55,13 @@ class ChatHandler(private val translator: Translator) {
             translator.translateChat(
                 body,
                 onSuccess = { translated -> onRenderThread { replaceInChat(message, register(message, prefix, translated)) } },
-                onFailure = {},
+                onFailure = { _ -> },
             )
             return null
         }
 
         for ((_, body) in lines) {
-            translator.translateChat(body, onSuccess = { onRenderThread { addLine(appended(it)) } }, onFailure = {})
+            translator.translateChat(body, onSuccess = { onRenderThread { addLine(appended(it)) } }, onFailure = { _ -> })
         }
         return null
     }
@@ -70,7 +69,7 @@ class ChatHandler(private val translator: Translator) {
     /** [原文] / [訳] ボタンから呼ばれる */
     fun swap(id: Int): Boolean {
         val entry = entries[id] ?: return false
-        val next = if (entry.current === entry.translated) entry.original.copy().append(button(id, "[訳]", "クリックで訳文を表示"))
+        val next = if (entry.current === entry.translated) entry.original.copy().append(button(id, T.tr("chat.show_translation"), T.tr("chat.show_translation.tooltip")))
         else entry.translated
         if (!replaceInChat(entry.current, next)) return false
         entry.current = next
@@ -79,13 +78,13 @@ class ChatHandler(private val translator: Translator) {
 
     private fun register(original: Component, prefix: String, translated: String): Component {
         val id = nextId++
-        val hover = HoverEvent.ShowText(Component.literal("原文: ").withStyle(ChatFormatting.GRAY).append(original.copy()))
+        val hover = HoverEvent.ShowText(T.tr("chat.original_prefix").withStyle(ChatFormatting.GRAY).append(original.copy()))
         // "[MVP+] Name: " の部分は原文の装飾のまま残し、本文は原文本文の先頭の装飾を引き継ぐ
         val (head, bodyStyle, bodyCodes) = splitStyled(original, if (prefix.isEmpty()) 0 else prefix.length + 2)
         val component = Component.empty()
             .append(head)
             .append(Component.literal(bodyCodes + translated).withStyle(bodyStyle.withHoverEvent(hover)))
-            .append(button(id, "[原文]", "クリックで原文を表示"))
+            .append(button(id, T.tr("chat.show_original"), T.tr("chat.show_original.tooltip")))
         entries[id] = Entry(original, component, component)
         return component
     }
@@ -131,11 +130,11 @@ class ChatHandler(private val translator: Translator) {
         return Split(head, bodyStyle ?: Style.EMPTY, bodyCodes)
     }
 
-    private fun button(id: Int, label: String, tooltip: String): Component =
-        Component.literal(" $label").withStyle {
+    private fun button(id: Int, label: Component, tooltip: Component): Component =
+        Component.literal(" ").append(label).withStyle {
             it.withColor(ChatFormatting.DARK_GRAY)
                 .withClickEvent(ClickEvent.RunCommand("chattranslator swap $id"))
-                .withHoverEvent(HoverEvent.ShowText(Component.literal(tooltip)))
+                .withHoverEvent(HoverEvent.ShowText(tooltip))
         }
 
     /** チャット履歴の中から target (同一インスタンス) を探して置き換える */

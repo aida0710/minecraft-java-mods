@@ -11,9 +11,9 @@ import java.util.concurrent.TimeUnit
  * ツールチップの大量リクエストでチャット翻訳が詰まらないようにする。
  */
 class Translator(
-    private val client: LlmClient,
-    private val cache: TranslationCache,
-    private val glossary: Glossary,
+    private val providers: Map<ProviderType, TranslationProvider>,
+    val cache: TranslationCache,
+    val dictionaries: Dictionaries,
     val itemNames: ItemNames,
 ) {
     private val pending: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -29,38 +29,45 @@ class Translator(
         ThreadPoolExecutor.AbortPolicy(),
     )
 
+    private fun provider(cfg: TranslatorConfig.Values = TranslatorConfig.current) = providers.getValue(cfg.provider)
+
+    fun isReady(cfg: TranslatorConfig.Values = TranslatorConfig.current) = provider(cfg).isReady(cfg)
+
+    fun notReadyReason(cfg: TranslatorConfig.Values = TranslatorConfig.current) = provider(cfg).notReadyReason(cfg)
+
     /**
-     * キャッシュキー。アイテム名保護の有無で訳文が変わるため区別する
+     * キャッシュキー。語の保護の有無で訳文が変わるため区別する
      * (アイテム一覧の読み込み前に保護なしで訳した結果が、保護ありの訳を隠さないように)
      */
-    private fun key(text: String): String {
-        val cfg = TranslatorConfig.current
-        val tag = if (itemNames.size > 0) "|items" else ""
+    private fun key(text: String, cfg: TranslatorConfig.Values = TranslatorConfig.current): String {
+        val tag = if (itemNames.size > 0) "|keep" else ""
         return cfg.modelKey + tag + "\u0000" + text
     }
 
     /** 辞書またはキャッシュにあれば即座に返す。無ければ null。 */
-    fun cached(text: String): String? = glossary.lookup(text) ?: cache.get(key(text))
+    fun cached(text: String): String? = dictionaries.lookup(text) ?: cache.get(key(text))
 
-    fun isSkipped(text: String): Boolean = glossary.shouldSkip(text)
+    fun isSkipped(text: String): Boolean = dictionaries.shouldSkip(text)
 
     /** チャット用: 完了時にコールバックを (キャッシュヒット時は呼び出し元、それ以外は翻訳スレッドから) 呼ぶ */
-    fun translateChat(text: String, onSuccess: (String) -> Unit, onFailure: () -> Unit) {
+    fun translateChat(text: String, onSuccess: (String) -> Unit, onFailure: (net.minecraft.network.chat.Component) -> Unit) {
+        // 設定 (言語・エンジン) は依頼した時点のものを使う (処理待ちの間に設定が変わっても混ざらないように)
+        val cfg = TranslatorConfig.current
         cached(text)?.let { onSuccess(it); return }
-        // 内蔵サーバーの起動待ち中は翻訳しない (原文のまま)
-        if (!client.isReady()) { onFailure(); return }
+        // エンジンの準備ができていなければ翻訳しない (原文のまま)
+        if (!isReady()) { onFailure(notReadyReason()); return }
         try {
             chatExecutor.execute {
-                runCatching { translateNow(text) }
+                runCatching { translateNow(text, cfg) }
                     .onSuccess(onSuccess)
                     .onFailure {
                         ChatTranslator.LOGGER.warn("Chat translation failed: {}", it.toString())
-                        onFailure()
+                        onFailure(net.minecraft.network.chat.Component.literal(it.message ?: it.toString()))
                     }
             }
         } catch (_: RejectedExecutionException) {
             ChatTranslator.LOGGER.warn("Chat translation queue is full; dropping message")
-            onFailure()
+            onFailure(T.tr("error.queue_full"))
         }
     }
 
@@ -70,14 +77,15 @@ class Translator(
      */
     fun translateTooltipLine(text: String): String? {
         cached(text)?.let { return it }
-        if (!client.isReady()) return null
-        val k = key(text)
+        if (!isReady()) return null
+        val cfg = TranslatorConfig.current
+        val k = key(text, cfg)
         val failedAt = failed[k]
         if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return null
         if (pending.add(k)) {
             val task = Runnable {
                 try {
-                    translateNow(text)
+                    translateNow(text, cfg)
                     failed.remove(k)
                 } catch (e: Exception) {
                     failed[k] = System.currentTimeMillis()
@@ -96,28 +104,29 @@ class Translator(
         return null
     }
 
-    private fun translateNow(text: String): String {
-        cached(text)?.let { return it }
-        val result = translateProtected(text)
+    private fun translateNow(text: String, cfg: TranslatorConfig.Values): String {
+        (dictionaries.lookup(text) ?: cache.get(key(text, cfg)))?.let { return it }
+        val result = translateProtected(text, cfg)
         if (result.isBlank()) throw IllegalStateException("empty translation")
-        cache.put(key(text), result)
+        cache.put(key(text, cfg), result)
         return result
     }
 
-    /** 既知のアイテム名を ITEMn に置き換えて訳し、元に戻す。プレースホルダーが崩れたら通常の翻訳にする */
-    private fun translateProtected(text: String): String {
-        // アイテム名 (protectItemNames が ON のときのみ読み込まれる) と glossary の keep を保護する
+    /** 保護語 (アイテム名・辞書の keep) を ITEMn に置き換えて訳し、元に戻す。プレースホルダーが崩れたら通常の翻訳にする */
+    private fun translateProtected(text: String, cfg: TranslatorConfig.Values): String {
+        val provider = provider(cfg)
         val p = itemNames.protect(text)
-        if (p.names.isEmpty()) return client.translate(text)
-        // アイテム名だけの文 (記号のみ残る) は訳さない
+        if (p.names.isEmpty()) return provider.translate(text, cfg)
+        // 保護語だけの文 (記号のみ残る) は訳さない
         if (p.text.replace(PLACEHOLDER, "").none { it.isLetter() }) return text
-        itemNames.restore(client.translate(p.text), p.names)?.let { return it }
+        itemNames.restore(provider.translate(p.text, cfg), p.names)?.let { return it }
         ChatTranslator.LOGGER.info("Protected term lost in translation; retrying without protection: {}", text)
-        return client.translate(text)
+        return provider.translate(text, cfg)
     }
 
     fun clearCache() {
         cache.clear()
+        cache.saveIfDirty()
         failed.clear()
     }
 

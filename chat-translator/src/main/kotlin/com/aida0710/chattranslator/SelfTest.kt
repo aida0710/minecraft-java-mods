@@ -1,6 +1,7 @@
 package com.aida0710.chattranslator
 
 import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
 import net.minecraft.client.gui.screens.ChatScreen
@@ -89,7 +90,28 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "cmd" -> mc.player!!.connection.sendCommand(args[1])
             // サーバーから § コード入りのシステムメッセージを受け取ったのと同じ経路で処理させる (Hypixel の再現)
             "inject" -> mc.gui.chatListener().handleSystemMessage(Component.literal(args[1].replace("\\n", "\n")), true)
-            "openchat" ->mc.gui.setScreen(ChatScreen("", false))
+            "openchat" -> mc.gui.setScreen(ChatScreen("", false))
+            // 設定画面を開く ("settings 1" で 2 番目のタブ)。"dictedit" はユーザー辞書の編集画面
+            "settings" -> SettingsScreen.open(null, args.getOrNull(1)?.toIntOrNull() ?: 0)
+            "dictedit" -> mc.gui.setScreen(UserDictionaryScreen(SettingsScreen(null, 2)))
+            "keep" -> log("keep add=${ChatTranslator.instance.dictionaries.addKeep(args[1])}")
+            // 設定値を直接変える: "set provider CLAUDE" など (画面の操作を模擬)
+            "lang" -> { val (s, t) = args[1].split(" "); TranslatorConfig.update(TranslatorConfig.sourceCode, s); TranslatorConfig.update(TranslatorConfig.targetCode, t) }
+            "provider" -> TranslatorConfig.update(TranslatorConfig.provider, ProviderType.valueOf(args[1]))
+            "install" -> ChatTranslator.instance.llama.installAsync(TranslatorConfig.current, startAfter = true)
+            // Minecraft の表示言語を切り替える (mod の画面の多言語表示を確認する用)
+            "uilang" -> { mc.languageManager.setSelected(args[1]); mc.options.languageCode = args[1]; mc.reloadResourcePacks() }
+            // インベントリを開いた状態でショートカットキーを押したときと同じイベントを送る (K = チャット翻訳 ON/OFF に割り当て)
+            "screenkey" -> {
+                val keys = ChatTranslator.instance.keys
+                keys.toggleChat.setKey(InputConstants.Type.KEYBOARD.getOrCreate(InputConstants.KEY_K))
+                KeyMapping.resetMapping()
+                val inv = net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!)
+                mc.gui.setScreen(inv)
+                net.minecraftforge.client.event.ScreenEvent.KeyPressed.Pre.BUS.post(net.minecraftforge.client.event.ScreenEvent.KeyPressed.Pre(inv, net.minecraft.client.input.KeyEvent(InputConstants.KEY_K, 0, 0)))
+                log("after K in inventory: chatEnabled=${TranslatorConfig.current.chatEnabled}")
+            }
+            "status" -> log("engine=${ChatTranslator.instance.engineStatus()} ready=${ChatTranslator.instance.translator.isReady()}")
             "close" -> mc.gui.setScreen(null)
             "screenshot" -> Screenshot.grab(mc.gameDirectory, args.getOrElse(1) { "selftest" } + ".png", mc.gameRenderer.mainRenderTarget(), 1) { log("screenshot: ${it.string}") }
             "holdkey" -> log("J held=${InputConstants.isKeyDown(InputConstants.KEY_J)}")

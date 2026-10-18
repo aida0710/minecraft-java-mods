@@ -2,21 +2,44 @@ package com.aida0710.chattranslator
 
 object TextUtil {
     private val FORMAT_CODE = Regex("§[0-9a-fk-orA-FK-OR]")
-    private val JAPANESE = Regex("[\\u3040-\\u30ff\\u3400-\\u9fff\\uff66-\\uff9f]")
-    private val LATIN_WORD = Regex("[A-Za-z]{2,}")
+    private val LATIN_WORD = Regex("[A-Za-z\\u00C0-\\u024F]{2,}")
 
     fun stripFormatting(text: String): String = FORMAT_CODE.replace(text, "")
 
-    /** 翻訳する価値がある英文かどうか（日本語を含む・英単語が無い・短すぎる・数値だけ等は除外） */
-    fun looksTranslatable(text: String, minLength: Int): Boolean {
+    /**
+     * 翻訳する価値がある文かどうか。
+     * 短すぎる・数値や記号が主体・すでに翻訳先の言語で書かれている・翻訳元の言語の文字を含まない、ものは除外する。
+     */
+    fun looksTranslatable(
+        text: String,
+        minLength: Int,
+        source: String = TranslatorConfig.current.sourceCode,
+        target: String = TranslatorConfig.current.targetCode,
+    ): Boolean {
         val t = text.trim()
         if (t.length < minLength) return false
-        if (JAPANESE.containsMatchIn(t)) return false
-        val words = LATIN_WORD.findAll(t).count()
-        if (words == 0) return false
         // "1,234/5,000 ❤" のような記号・数値主体の行は除外
         val letters = t.count { it.isLetter() }
-        return letters * 2 >= t.count { !it.isWhitespace() }
+        if (letters == 0 || letters * 2 < t.count { !it.isWhitespace() }) return false
+
+        val targetScript = Languages.get(target)?.script
+        if (targetScript != null && alreadyInScript(t, targetScript)) return false
+
+        val sourceScript = Languages.get(source)?.script ?: return true // 自動検出
+        return when (sourceScript) {
+            Script.LATIN -> LATIN_WORD.containsMatchIn(t)
+            // 日本語は漢字だけの文もある
+            Script.JAPANESE -> t.any { Languages.inScript(it, Script.JAPANESE) || Languages.inScript(it, Script.HAN) }
+            else -> t.any { Languages.inScript(it, sourceScript) }
+        }
+    }
+
+    /** ラテン文字の言語どうしは文字では区別できないので判定しない */
+    private fun alreadyInScript(t: String, script: Script): Boolean = when (script) {
+        Script.LATIN -> false
+        // 中国語は漢字のみ。かなを含めば日本語とみなす
+        Script.HAN -> t.any { Languages.inScript(it, Script.HAN) } && t.none { Languages.inScript(it, Script.JAPANESE) }
+        else -> t.any { Languages.inScript(it, script) }
     }
 
     /**

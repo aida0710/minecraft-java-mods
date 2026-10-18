@@ -1,0 +1,26 @@
+{
+  "name": "Hypixel SkyBlock",
+  "description": "アイテム名 (公開 API の約 5,000 件)・地名・ボス名を英語のまま残し、ステータス行などを翻訳しない",
+  "hypixelItems": true,
+  "keep": [
+    "Catacombs", "Master Mode", "Dungeon Hub", "Hub", "Private Island", "Bazaar", "Auction House",
+    "Dwarven Mines", "Crystal Hollows", "Deep Caverns", "Gold Mine", "Spider's Den", "The End", "The Park",
+    "The Barn", "Mushroom Desert", "Crimson Isle", "Kuudra", "Garden", "The Rift", "Jerry's Workshop",
+    "Slayer", "Revenant Horror", "Tarantula Broodfather", "Sven Packmaster", "Voidgloom Seraph", "Inferno Demonlord",
+    "Riftstalker Bloodfiend", "Wither Shield", "Necron", "Goldor", "Storm", "Maxor", "Bonzo", "Scarf",
+    "The Professor", "Thorn", "Livid", "Sadan", "Jerry", "Mort", "Kat", "Elizabeth", "SkyBlock"
+  ],
+  "terms": {
+    "SkyBlock Menu (Click)": "スカイブロックメニュー (クリック)",
+    "Click to view!": "クリックして表示！",
+    "Click to open!": "クリックして開く！",
+    "Right-click to view recipes!": "右クリックでレシピ表示！",
+    "This item can be reforged!": "このアイテムはリフォージできます！"
+  },
+  "skip": [
+    "^\\s*(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC|DIVINE|SPECIAL|VERY SPECIAL)( [A-Z ]+)?$",
+    "^\\s*(Gear Score|Damage|Strength|Defense|Health|Speed|Crit Chance|Crit Damage|Intelligence|Ferocity|Attack Speed|Bonus Attack Speed|Mining Speed|Mining Fortune|Magic Find|Pet Luck|True Defense|Sea Creature Chance|Ability Damage|Farming Fortune|Foraging Fortune|Health Regen|Vitality|Mending|Swing Range|Breaking Power|Pristine|Fishing Speed): .*$",
+    "^\\s*(Mana Cost|Cooldown|Soulflow Cost|Health Cost): .*$",
+    "^\\s*[-=_▬]{4,}\\s*$"
+  ]
+}

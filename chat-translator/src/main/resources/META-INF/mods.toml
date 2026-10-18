@@ -11,8 +11,8 @@ displayName="Chat Translator"
 authors="aida0710"
 displayURL="https://github.com/aida0710/minecraft-forge-mods"
 description='''
-Translates incoming chat and item tooltips with a local LLM (Ollama / LM Studio / llama.cpp, OpenAI-compatible API).
-ローカルLLMでチャットとアイテムの説明文を英→日翻訳します。
+Translates chat and item tooltips with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
+チャットとアイテムの説明文を翻訳します (日本語 / English / 简体中文 UI)。
 '''
 
 [[dependencies.chattranslator]]

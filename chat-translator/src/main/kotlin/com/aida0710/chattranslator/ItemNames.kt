@@ -24,8 +24,17 @@ class ItemNames(private val file: Path) {
     /** 保護対象の語数 (アイテム名 + keep) */
     val size get() = all.size + extra.size
 
+    private val loading = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** 有効なアイテム名を消す (Hypixel 辞書を無効にしたとき)。keep 語は残す */
+    fun clear() {
+        all = emptySet()
+        rebuild()
+        loading.set(false)
+    }
+
     fun loadAsync(enabled: Boolean) {
-        if (!enabled) return
+        if (!enabled || all.isNotEmpty() || !loading.compareAndSet(false, true)) return
         Thread({
             runCatching {
                 if (Files.exists(file)) set(read())
@@ -37,6 +46,7 @@ class ItemNames(private val file: Path) {
                 }
                 ChatTranslator.LOGGER.info("SkyBlock item names loaded: {}", all.size)
             }.onFailure { ChatTranslator.LOGGER.warn("Failed to load SkyBlock item names", it) }
+            loading.set(false)
         }, "ChatTranslator-items").apply { isDaemon = true }.start()
     }
 
