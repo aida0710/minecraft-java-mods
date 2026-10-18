@@ -1,0 +1,30 @@
+modLoader="javafml"
+loaderVersion="[66,)"
+license="All Rights Reserved"
+issueTrackerURL="https://github.com/aida0710/minecraft-forge-mods/issues"
+clientSideOnly=true
+
+[[mods]]
+modId="chattranslator"
+version="${mod_version}"
+displayName="Chat Translator"
+authors="aida0710"
+displayURL="https://github.com/aida0710/minecraft-forge-mods"
+description='''
+Translates incoming chat and item tooltips with a local LLM (Ollama / LM Studio / llama.cpp, OpenAI-compatible API).
+ローカルLLMでチャットとアイテムの説明文を英→日翻訳します。
+'''
+
+[[dependencies.chattranslator]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.chattranslator]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="CLIENT"

@@ -1,0 +1,109 @@
+package com.aida0710.chattranslator
+
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+
+/**
+ * 翻訳のキュー管理。チャットとツールチップでキューを分け、
+ * ツールチップの大量リクエストでチャット翻訳が詰まらないようにする。
+ */
+class Translator(
+    private val client: LlmClient,
+    private val cache: TranslationCache,
+    private val glossary: Glossary,
+) {
+    private val pending: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val failed = ConcurrentHashMap<String, Long>()
+
+    private val chatExecutor = executor("chat", 256)
+    private val tooltipExecutor = executor("tooltip", 64)
+
+    private fun executor(name: String, capacity: Int) = ThreadPoolExecutor(
+        1, 1, 0L, TimeUnit.MILLISECONDS,
+        LinkedBlockingDeque(capacity),
+        { r -> Thread(r, "ChatTranslator-$name").apply { isDaemon = true } },
+        ThreadPoolExecutor.AbortPolicy(),
+    )
+
+    private fun key(text: String) = TranslatorConfig.current.model + "\u0000" + text
+
+    /** 辞書またはキャッシュにあれば即座に返す。無ければ null。 */
+    fun cached(text: String): String? = glossary.lookup(text) ?: cache.get(key(text))
+
+    fun isSkipped(text: String): Boolean = glossary.shouldSkip(text)
+
+    /** チャット用: 完了時にコールバックを (キャッシュヒット時は呼び出し元、それ以外は翻訳スレッドから) 呼ぶ */
+    fun translateChat(text: String, onSuccess: (String) -> Unit, onFailure: () -> Unit) {
+        cached(text)?.let { onSuccess(it); return }
+        try {
+            chatExecutor.execute {
+                runCatching { translateNow(text) }
+                    .onSuccess(onSuccess)
+                    .onFailure {
+                        ChatTranslator.LOGGER.warn("Chat translation failed: {}", it.toString())
+                        onFailure()
+                    }
+            }
+        } catch (_: RejectedExecutionException) {
+            ChatTranslator.LOGGER.warn("Chat translation queue is full; dropping message")
+            onFailure()
+        }
+    }
+
+    /**
+     * ツールチップ用: キャッシュにあれば返し、無ければ非同期に翻訳を予約して null を返す。
+     * 毎フレーム呼ばれる前提なので重複予約・失敗直後の再試行はしない。
+     */
+    fun translateTooltipLine(text: String): String? {
+        cached(text)?.let { return it }
+        val k = key(text)
+        val failedAt = failed[k]
+        if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return null
+        if (pending.add(k)) {
+            val task = Runnable {
+                try {
+                    translateNow(text)
+                    failed.remove(k)
+                } catch (e: Exception) {
+                    failed[k] = System.currentTimeMillis()
+                    ChatTranslator.LOGGER.debug("Tooltip translation failed: {}", e.toString())
+                } finally {
+                    pending.remove(k)
+                }
+            }
+            try {
+                tooltipExecutor.execute(task)
+            } catch (_: RejectedExecutionException) {
+                // キューが満杯なら捨て、次のフレームで再予約できるようにする
+                pending.remove(k)
+            }
+        }
+        return null
+    }
+
+    private fun translateNow(text: String): String {
+        cached(text)?.let { return it }
+        val result = client.translate(text)
+        if (result.isBlank()) throw IllegalStateException("empty translation")
+        cache.put(key(text), result)
+        return result
+    }
+
+    fun clearCache() {
+        cache.clear()
+        failed.clear()
+    }
+
+    fun shutdown() {
+        chatExecutor.shutdownNow()
+        tooltipExecutor.shutdownNow()
+        cache.saveIfDirty()
+    }
+
+    private companion object {
+        const val RETRY_AFTER_MS = 30_000L
+    }
+}

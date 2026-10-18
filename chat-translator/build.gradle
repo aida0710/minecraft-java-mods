@@ -1,0 +1,84 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '[7.0.17,8)'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.21'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+version = mod_version
+group = 'com.aida0710.chattranslator'
+base.archivesName = 'chattranslator'
+
+// Mojang ships Java 25 to end users in 26.1+, so the mod targets Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+kotlin.jvmToolchain(25)
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+        }
+        register('client')
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+configurations {
+    // Kotlin 標準ライブラリはリロケートして mod jar に同梱する (Kotlin for Forge 不要)
+    shade
+    implementation.extendsFrom shade
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+    shade 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
+
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5:2.4.21'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources', ProcessResources) {
+    def props = [mod_version: mod_version, minecraft_version_range: minecraft_version_range, forge_version_range: forge_version_range]
+    inputs.properties props
+    filesMatching(['META-INF/mods.toml']) { expand props }
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
+
+tasks.named('jar', Jar) {
+    archiveClassifier = 'slim'
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier = ''
+    configurations = [project.configurations.shade]
+    relocate 'kotlin', 'com.aida0710.chattranslator.shadow.kotlin'
+    // 未使用の stdlib クラスを除去して jar を小さくする (リフレクションは使っていない)
+    minimize()
+    // 同梱すると Forge のモジュールシステムと衝突するため除外
+    exclude 'module-info.class', 'META-INF/versions/*/module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
+    manifest.attributes('Implementation-Version': mod_version)
+}
+
+tasks.named('assemble') { dependsOn 'shadowJar' }
+
+// ForgeGradle の開発実行 (merge-source-sets) は Java の出力ディレクトリしか結合しないため、
+// Kotlin のクラスも同じディレクトリへ出力する
+tasks.named('compileKotlin') {
+    destinationDirectory = sourceSets.main.java.destinationDirectory
+}
