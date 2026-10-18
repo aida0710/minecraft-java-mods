@@ -36,11 +36,11 @@ class Translator(
     fun notReadyReason(cfg: TranslatorConfig.Values = TranslatorConfig.current) = provider(cfg).notReadyReason(cfg)
 
     /**
-     * キャッシュキー。語の保護の有無で訳文が変わるため区別する
+     * キャッシュキー。語の保護 (アイテム一覧の読み込み状況・keep 語) で訳文が変わるため区別する
      * (アイテム一覧の読み込み前に保護なしで訳した結果が、保護ありの訳を隠さないように)
      */
     private fun key(text: String, cfg: TranslatorConfig.Values = TranslatorConfig.current): String {
-        val tag = if (itemNames.size > 0) "|keep" else ""
+        val tag = "|" + itemNames.protectionTag
         return cfg.modelKey + tag + "\u0000" + text
     }
 

@@ -21,6 +21,12 @@ class ItemNames(private val file: Path) {
     @Volatile private var byFirstWord: Map<String, List<String>> = emptyMap()
     @Volatile private var all: Set<String> = emptySet()
 
+    /**
+     * キャッシュキー用の目印。アイテム一覧の読み込み済みかどうかと keep 語の内容で変わる
+     * (読み込み前に保護なしで訳した結果や、keep 追加前の訳が、後から使われないように)
+     */
+    val protectionTag: String get() = (if (all.isNotEmpty()) "items" else "") + ":" + Integer.toHexString(extra.hashCode())
+
     /** 保護対象の語数 (アイテム名 + keep) */
     val size get() = all.size + extra.size
 

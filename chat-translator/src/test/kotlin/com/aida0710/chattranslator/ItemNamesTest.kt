@@ -62,4 +62,15 @@ class ItemNamesTest {
         assertEquals("Hyperionレベル", names.restore("アイテム1レベル", p.names))
         assertEquals("Hyperion のレベル？", names.restore("[ITEM1] のレベル？", p.names))
     }
+
+    @Test
+    fun protectionTagChangesWithItemListAndKeepTerms() {
+        val n = ItemNames(Files.createTempDirectory("items").resolve("items.json"))
+        val empty = n.protectionTag
+        n.setExtra(listOf("Catacombs"))
+        val withKeep = n.protectionTag
+        n.setForTest(listOf("Hyperion"))
+        val withItems = n.protectionTag
+        assertTrue(empty != withKeep && withKeep != withItems && withItems.startsWith("items"))
+    }
 }
