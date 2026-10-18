@@ -77,6 +77,8 @@ tasks.named('shadowJar') {
     relocate 'kotlin', 'com.aida0710.chattranslator.shadow.kotlin'
     // 同梱すると Forge のモジュールシステムと衝突するため除外
     exclude 'module-info.class', 'META-INF/versions/*/module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
+    // kotlin-stdlib が依存する注釈ライブラリは Minecraft 側にもあり、同梱すると衝突しうる
+    exclude 'org/intellij/**', 'org/jetbrains/annotations/**'
     manifest.attributes('Implementation-Version': mod_version)
 }
 
@@ -86,4 +88,10 @@ tasks.named('assemble') { dependsOn 'shadowJar' }
 // Kotlin のクラスも同じディレクトリへ出力する
 tasks.named('compileKotlin') {
     destinationDirectory = sourceSets.main.java.destinationDirectory
+}
+
+// Kotlin のフルコンパイルは出力ディレクトリを空にするため、リソースのコピーはその後に行う
+// (先にコピーすると mods.toml や言語ファイルが消えた jar ができてしまう)
+tasks.named('processResources') {
+    mustRunAfter 'compileKotlin'
 }

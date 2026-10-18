@@ -37,7 +37,10 @@ jobs:
           echo "jar=$JAR"
           unzip -l "$JAR" | grep -q 'com/aida0710/chattranslator/ChatTranslator.class'
           unzip -l "$JAR" | grep -q 'com/aida0710/chattranslator/shadow/kotlin/Unit.class'
-          if unzip -l "$JAR" | grep -E ' kotlin/' ; then echo 'unrelocated kotlin classes found'; exit 1; fi
+          for f in META-INF/mods.toml META-INF/accesstransformer.cfg assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
+            unzip -l "$JAR" | grep -q "$f" || { echo "missing $f"; exit 1; }
+          done
+          if unzip -l "$JAR" | grep -E ' (kotlin|org/intellij|org/jetbrains)/' ; then echo 'unrelocated or unwanted classes found'; exit 1; fi
 
       - uses: actions/upload-artifact@v7
         with:
