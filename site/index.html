@@ -1,0 +1,33 @@
+---
+layout: default
+title: Minecraft Java Mods
+---
+<section class="sky sky--home">
+  <div class="sky-inner">
+    <h1 class="pixel-title">Minecraft Java Mods</h1>
+    <p class="sky-lead" data-lang="ja">aida0710 が作っている Minecraft Java 版の mod です。Forge・NeoForge・Fabric に対応しています。</p>
+    <p class="sky-lead" data-lang="en">Minecraft: Java Edition mods by aida0710, for Forge, NeoForge and Fabric.</p>
+  </div>
+  <div class="ground" aria-hidden="true"></div>
+</section>
+
+<main class="gui-panel">
+  <h2 class="gui-title"><span data-lang="ja">mod 一覧</span><span data-lang="en">Mods</span></h2>
+  <ul class="mod-grid">
+    {% assign mods = site.mods | sort: "order" %}
+    {% for mod in mods %}
+    <li>
+      <a class="mod-card tooltip-box" href="{{ mod.url | relative_url }}">
+        <img class="mod-card-shot" src="{{ mod.thumbnail | relative_url }}" alt="" width="1280" height="720" loading="lazy">
+        <span class="mod-card-body">
+          <span class="mod-card-name" style="color: {{ mod.color }}">{{ mod.title }}</span>
+          <span class="lore" data-lang="ja">{{ mod.summary.ja }}</span>
+          <span class="lore" data-lang="en">{{ mod.summary.en }}</span>
+          <span class="stat-line"><span class="stat-key">Minecraft</span> {{ mod.minecraft }}</span>
+          <span class="stat-line"><span class="stat-key" data-lang="ja">ローダー</span><span class="stat-key" data-lang="en">Loaders</span> {{ mod.loaders | join: " / " }}</span>
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</main>

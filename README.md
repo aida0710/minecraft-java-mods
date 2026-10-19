@@ -1,9 +1,26 @@
-# minecraft-forge-mods
+# Minecraft Java Mods
 
-Personal Minecraft mods (Kotlin) for Forge, NeoForge and Fabric.
+Minecraft: Java Edition の mod 集です（Kotlin、Forge / NeoForge / Fabric）。
+Minecraft: Java Edition mods in Kotlin for Forge, NeoForge and Fabric.
 
-| Mod | MC / Loaders | Description |
-| --- | --- | --- |
-| [chat-translator](chat-translator/) | 26.3 / Forge 66.0.x, NeoForge 26.3.0.x, Fabric (Fabric API) | Translates chat and item tooltips with a built-in LLM or Claude / DeepL / Google / OpenAI-compatible APIs. Settings GUI, dictionaries, ja/en/zh UI. Built for Hypixel SkyBlock. |
+紹介サイト / Website: https://aida0710.github.io/minecraft-java-mods/
 
-Each mod is an independent Gradle project in its own directory. CI builds every push; the built jars are uploaded as workflow artifacts.
+| Mod | Minecraft | Loaders | 内容 / Description |
+| --- | --- | --- | --- |
+| [Chat Translator](chat-translator/) | 26.3 | Forge, NeoForge, Fabric | チャット・アイテムの説明・本を翻訳し、自分の発言も翻訳して送れる。Translates chat, item tooltips and books, and sends your own messages translated. |
+
+ダウンロード / Download: [Releases](https://github.com/aida0710/minecraft-java-mods/releases)
+
+## フォルダの構成
+
+| フォルダ | 中身 |
+| --- | --- |
+| `<mod>/` (例: `chat-translator/`) | mod ごとの Gradle プロジェクト。使い方と開発の手順はそれぞれの README |
+| `site/` | 紹介サイト (GitHub Pages)。mod を足すときは `site/_mods/<mod>.md` を 1 つ足す ([site/README.md](site/README.md)) |
+| `.github/workflows/` | `build.yml`: push のたびに mod を組み立てて jar を検査する。`pages.yml`: `site/` が変わったら紹介サイトを公開する |
+
+mod を足すときは、新しいフォルダに Gradle プロジェクトを作り、`build.yml` に組み立ての手順を、`site/_mods/` に紹介ページを足します。
+
+---
+
+Minecraft is a trademark of Mojang. This project is not an official Minecraft product and is not approved by or associated with Mojang or Microsoft.

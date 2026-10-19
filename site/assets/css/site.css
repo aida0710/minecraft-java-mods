@@ -1,0 +1,501 @@
+/*
+ * Minecraft Java Mods の紹介サイト。Minecraft の画面の作りを借りる:
+ *  - 見出しの背景は空と地面、ページの背景は設定画面の暗い土
+ *  - 内容はインベントリの灰色の板 (gui-panel)、mod のカードはアイテムの説明 (tooltip-box) の形
+ *  - 見出しとカードはドット絵の書体 (DotGothic16)、本文は読みやすさを優先して Noto Sans JP
+ */
+:root {
+  --sky-top: #4f86e0;
+  --sky-bottom: #8fb9f2;
+  /* 空の上の白い文字の影 (Minecraft の文字の影を空の色に寄せる) */
+  --sky-text-shadow: #24467e;
+  --grass: #5da130;
+  --grass-dark: #3f7a1f;
+  --dirt: #79553a;
+  --dirt-dark: #4e3523;
+  --gui: #c6c6c6;
+  --gui-highlight: #ffffff;
+  --gui-shade: #555555;
+  --gui-text: #3f3f3f;
+  --slot: #8b8b8b;
+  --slot-dark: #373737;
+  --tooltip-bg: rgba(16, 0, 16, 0.94);
+  --tooltip-border-top: #5000ff;
+  --tooltip-border-bottom: #28007f;
+  --mc-white: #ffffff;
+  --mc-gray: #aaaaaa;
+  --mc-blue: #5555ff;
+  --mc-yellow: #ffff55;
+  --text-shadow: #3f3f3f;
+  --pixel: "DotGothic16", "Noto Sans JP", system-ui, sans-serif;
+  --body: "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* 土の模様 (16x16 の点を拡大して並べる) */
+  --dirt-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%2379553a'/%3E%3Cg fill='%23593d29'%3E%3Crect x='1' y='2' width='2' height='1'/%3E%3Crect x='9' y='1' width='1' height='2'/%3E%3Crect x='5' y='6' width='2' height='2'/%3E%3Crect x='12' y='5' width='2' height='1'/%3E%3Crect x='2' y='11' width='1' height='2'/%3E%3Crect x='8' y='12' width='2' height='1'/%3E%3Crect x='13' y='13' width='1' height='2'/%3E%3C/g%3E%3Cg fill='%23966c4a'%3E%3Crect x='4' y='1' width='1' height='1'/%3E%3Crect x='14' y='2' width='1' height='1'/%3E%3Crect x='10' y='8' width='2' height='1'/%3E%3Crect x='1' y='7' width='1' height='1'/%3E%3Crect x='5' y='13' width='1' height='1'/%3E%3Crect x='11' y='15' width='1' height='1'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* 選んでいない言語の文を隠す (lang.js が html の lang を決める) */
+html[lang="ja"] [data-lang="en"],
+html[lang="en"] [data-lang="ja"] {
+  display: none !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--gui-text);
+  /* 設定画面の背景と同じく、土の模様を暗くして敷く */
+  background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), var(--dirt-pattern) 0 0 / 64px 64px;
+  background-color: var(--dirt-dark);
+  image-rendering: pixelated;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: auto;
+}
+
+a {
+  color: var(--mc-blue);
+}
+
+:focus-visible {
+  outline: 3px solid var(--mc-yellow);
+  outline-offset: 2px;
+}
+
+/* ---- 上の帯 ---- */
+
+.topbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.topbar-home {
+  font-family: var(--pixel);
+  font-size: 18px;
+  color: var(--mc-white);
+  text-decoration: none;
+  text-shadow: 2px 2px 0 var(--text-shadow);
+}
+
+.topbar-actions,
+.lang-switch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---- Minecraft のボタン ---- */
+
+.mc-button {
+  display: inline-block;
+  padding: 8px 18px;
+  font-family: var(--pixel);
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--mc-white);
+  text-decoration: none;
+  text-shadow: 2px 2px 0 var(--text-shadow);
+  cursor: pointer;
+  background: #707070;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 #a8a8a8, inset -2px -3px 0 #3e3e3e;
+}
+
+.mc-button:hover {
+  background: #7d86c5;
+  box-shadow: inset 2px 2px 0 #b9c0f2, inset -2px -3px 0 #4a5196;
+}
+
+.mc-button--small {
+  padding: 4px 10px;
+  font-size: 14px;
+}
+
+.mc-button[aria-pressed="true"] {
+  color: var(--mc-yellow);
+  background: #4a4a4a;
+  box-shadow: inset 2px 2px 0 #2b2b2b, inset -2px -2px 0 #6b6b6b;
+}
+
+/* ---- 空と地面 ---- */
+
+.sky {
+  position: relative;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom));
+  color: var(--mc-white);
+}
+
+.sky-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 120px 24px 72px;
+}
+
+.sky-inner--mod {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .sky-inner--mod {
+    grid-template-columns: 5fr 6fr;
+  }
+}
+
+.pixel-title {
+  margin: 0 0 16px;
+  font-family: var(--pixel);
+  font-size: clamp(40px, 7vw, 80px);
+  font-weight: 400;
+  line-height: 1.1;
+  text-shadow: 0.06em 0.06em 0 var(--text-shadow);
+}
+
+.sky-lead {
+  max-width: 34em;
+  margin: 0 0 20px;
+  font-size: 18px;
+  text-shadow: 2px 2px 0 var(--sky-text-shadow);
+}
+
+.sky-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 24px;
+}
+
+.badge {
+  padding: 2px 10px;
+  font-family: var(--pixel);
+  font-size: 15px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.sky-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+
+/* 草と土の地面 (上 6px が草) */
+.ground {
+  height: 40px;
+  background:
+    linear-gradient(var(--grass) 0 6px, var(--grass-dark) 6px 10px, transparent 10px),
+    var(--dirt-pattern) 0 0 / 40px 40px;
+}
+
+/* ---- チャット欄の動き (英語の行が日本語に変わる) ---- */
+
+.chat-demo {
+  margin: 0;
+}
+
+/* 英語の行と日本語の行を同じ場所に重ね、片方ずつ見せる */
+.chat-box {
+  display: grid;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.chat-line {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--mc-white);
+  text-shadow: 2px 2px 0 var(--text-shadow);
+}
+
+.chat-original,
+.chat-translated {
+  grid-area: 1 / 1;
+}
+
+.chat-original {
+  animation: chat-original 8s steps(1, end) infinite;
+}
+
+.chat-translated {
+  opacity: 0;
+  animation: chat-translated 8s steps(1, end) infinite;
+}
+
+.chat-button {
+  color: #555555;
+  text-shadow: none;
+}
+
+@keyframes chat-original {
+  0% { opacity: 1; }
+  30% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes chat-translated {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-original {
+    animation: none;
+    opacity: 0;
+  }
+  .chat-translated {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.chat-demo figcaption {
+  margin-top: 10px;
+  font-size: 15px;
+  text-shadow: 2px 2px 0 var(--sky-text-shadow);
+}
+
+/* ---- インベントリの板 ---- */
+
+.gui-panel {
+  max-width: 1080px;
+  margin: 40px auto;
+  padding: 28px clamp(16px, 4vw, 40px) 40px;
+  background: var(--gui);
+  border: 3px solid #000;
+  box-shadow: inset 4px 4px 0 var(--gui-highlight), inset -4px -4px 0 var(--gui-shade);
+}
+
+.gui-title {
+  margin: 0 0 20px;
+  font-family: var(--pixel);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--gui-text);
+}
+
+.section + .section {
+  margin-top: 48px;
+}
+
+/* インベントリのマス (くぼんだ枠) */
+.slot-frame {
+  padding: 4px;
+  background: var(--slot);
+  border-top: 3px solid var(--slot-dark);
+  border-left: 3px solid var(--slot-dark);
+  border-right: 3px solid var(--gui-highlight);
+  border-bottom: 3px solid var(--gui-highlight);
+}
+
+.slot-frame video {
+  width: 100%;
+}
+
+/* ---- mod の一覧 (アイテムの説明の形) ---- */
+
+.mod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tooltip-box {
+  display: block;
+  padding: 6px;
+  color: var(--mc-white);
+  text-decoration: none;
+  background: var(--tooltip-bg);
+  border: 3px solid;
+  border-image: linear-gradient(var(--tooltip-border-top), var(--tooltip-border-bottom)) 1;
+  outline: 3px solid var(--tooltip-bg);
+}
+
+/* カードの縁 (outline) を使っているので、キーボードで選んだときの枠をここで上書きする */
+.tooltip-box:focus-visible {
+  outline: 3px solid var(--mc-yellow);
+}
+
+.mod-card:hover .mod-card-name,
+.mod-card:focus-visible .mod-card-name {
+  text-decoration: underline;
+}
+
+.mod-card-shot {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.mod-card-body {
+  display: block;
+  padding: 0 8px 6px;
+  font-family: var(--pixel);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.mod-card-name {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 22px;
+  text-shadow: 2px 2px 0 #3f153f;
+}
+
+.lore {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--mc-gray);
+}
+
+.stat-line {
+  display: block;
+  color: var(--mc-white);
+}
+
+.stat-key {
+  color: var(--mc-gray);
+}
+
+/* ---- できること ---- */
+
+.features {
+  display: grid;
+  gap: 36px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: grid;
+  gap: 16px 32px;
+  align-items: center;
+}
+
+@media (min-width: 820px) {
+  .feature {
+    grid-template-columns: 3fr 2fr;
+  }
+  .feature:nth-child(even) .slot-frame {
+    order: 2;
+  }
+}
+
+.feature h3 {
+  margin: 0 0 8px;
+  font-family: var(--pixel);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.feature p {
+  margin: 0;
+  max-width: 32em;
+}
+
+/* ---- 本文 (入れ方・エンジンの表など) ---- */
+
+.prose h2 {
+  margin: 40px 0 12px;
+  font-family: var(--pixel);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose p,
+.prose li {
+  max-width: 44em;
+}
+
+.prose code {
+  padding: 1px 6px;
+  font-size: 0.9em;
+  color: var(--mc-white);
+  background: var(--slot-dark);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--slot);
+  color: var(--mc-white);
+  border-top: 3px solid var(--slot-dark);
+  border-left: 3px solid var(--slot-dark);
+  border-right: 3px solid var(--gui-highlight);
+  border-bottom: 3px solid var(--gui-highlight);
+}
+
+.prose th,
+.prose td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 2px solid var(--gui-shade);
+}
+
+.prose th {
+  font-family: var(--pixel);
+  font-weight: 400;
+  background: var(--gui-shade);
+}
+
+
+
+/* ---- 足元 ---- */
+
+.footer {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 8px 24px 40px;
+  font-size: 14px;
+  color: #d8d8d8;
+}
+
+@media (max-width: 600px) {
+  body {
+    font-size: 16px;
+  }
+  .sky-inner {
+    padding: 132px 16px 48px;
+  }
+  .chat-line {
+    font-size: 16px;
+  }
+  .gui-panel {
+    margin: 24px 8px;
+  }
+  /* 表は狭い画面では横に動かして読む */
+  .prose table {
+    display: block;
+    overflow-x: auto;
+  }
+}

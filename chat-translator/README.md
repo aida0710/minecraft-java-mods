@@ -17,7 +17,7 @@
 
 ## 1. 導入
 
-1. [Actions](https://github.com/aida0710/minecraft-forge-mods/actions) の最新ビルドの Artifact、または Release から、使うローダーの jar を取得
+1. [Releases](https://github.com/aida0710/minecraft-java-mods/releases) から、使うローダーの jar を取得 (紹介ページ: https://aida0710.github.io/minecraft-java-mods/chat-translator/)
    - Forge: `chattranslator-forge-x.y.z.jar`
    - NeoForge: `chattranslator-neoforge-x.y.z.jar`
    - Fabric: `chattranslator-fabric-x.y.z.jar` (Fabric API も `mods/` に入れる)

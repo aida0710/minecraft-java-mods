@@ -1,0 +1,67 @@
+---
+layout: default
+---
+<section class="sky">
+  <div class="sky-inner sky-inner--mod">
+    <div class="sky-text">
+      <h1 class="pixel-title">{{ page.title }}</h1>
+      <p class="sky-lead" data-lang="ja">{{ page.summary.ja }}</p>
+      <p class="sky-lead" data-lang="en">{{ page.summary.en }}</p>
+      <p class="sky-meta">
+        <span class="badge">Minecraft {{ page.minecraft }}</span>
+        {% for loader in page.loaders %}<span class="badge">{{ loader }}</span>{% endfor %}
+      </p>
+      <p class="sky-actions">
+        <a class="mc-button" href="https://github.com/{{ site.repository }}/releases"><span data-lang="ja">ダウンロード</span><span data-lang="en">Download</span></a>
+        <a class="mc-button" href="https://github.com/{{ site.repository }}/tree/main/{{ page.source }}"><span data-lang="ja">ソースコード</span><span data-lang="en">Source code</span></a>
+      </p>
+    </div>
+    {% if page.demo %}
+    <figure class="chat-demo" aria-label="{{ page.demo.prefix }}{{ page.demo.original }}">
+      <div class="chat-box">
+        <p class="chat-line chat-original"><span style="color: {{ page.demo.prefix_color }}">{{ page.demo.prefix }}</span>{{ page.demo.original }}</p>
+        <p class="chat-line chat-translated" aria-hidden="true"><span style="color: {{ page.demo.prefix_color }}">{{ page.demo.prefix }}</span>{{ page.demo.translated }} <span class="chat-button" data-lang="ja">[原文]</span><span class="chat-button" data-lang="en">[Original]</span></p>
+      </div>
+      <figcaption>
+        <span data-lang="ja">届いた英語のチャットが、同じ行のまま日本語に変わります</span>
+        <span data-lang="en">An incoming chat line is replaced with its translation in place</span>
+      </figcaption>
+    </figure>
+    {% endif %}
+  </div>
+  <div class="ground" aria-hidden="true"></div>
+</section>
+
+<main class="gui-panel">
+  {% if page.video %}
+  <section class="section">
+    <h2 class="gui-title"><span data-lang="ja">紹介動画</span><span data-lang="en">Video</span></h2>
+    <div class="slot-frame">
+      <video controls preload="metadata" playsinline poster="{{ page.video_poster | relative_url }}" src="{{ page.video | relative_url }}"></video>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if page.features %}
+  <section class="section">
+    <h2 class="gui-title"><span data-lang="ja">できること</span><span data-lang="en">Features</span></h2>
+    <ul class="features">
+      {% for feature in page.features %}
+      <li class="feature">
+        <div class="slot-frame"><img src="{{ feature.image | relative_url }}" alt="" width="1280" height="720" loading="lazy"></div>
+        <div class="feature-text">
+          <h3 data-lang="ja">{{ feature.ja.title }}</h3>
+          <h3 data-lang="en">{{ feature.en.title }}</h3>
+          <p data-lang="ja">{{ feature.ja.text }}</p>
+          <p data-lang="en">{{ feature.en.text }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="section prose">
+    {{ content }}
+  </section>
+</main>
