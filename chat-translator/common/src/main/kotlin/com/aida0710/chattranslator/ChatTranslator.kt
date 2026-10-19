@@ -41,6 +41,10 @@ class ChatTranslator(configDir: Path) {
         private set
     lateinit var tooltip: TooltipHandler
         private set
+    lateinit var book: BookHandler
+        private set
+    lateinit var send: SendHandler
+        private set
     val keys = Keybinds(this)
 
     private var selfTest: SelfTest? = null
@@ -74,9 +78,11 @@ class ChatTranslator(configDir: Path) {
             ),
             cache, dictionaries, itemNames,
         )
-        chat = ChatHandler(translator)
+        send = SendHandler(translator, ::queueNotice)
+        chat = ChatHandler(translator) { send.isRecentlySent(it) }
         LOGGER.info("Chat replace mode available: {}", chat.canReplace)
         tooltip = TooltipHandler(translator) { keys.showOriginal() }
+        book = BookHandler(translator) { keys.showOriginal() }
         llama.refresh(cfg)
         TranslatorConfig.onChange(::onSettingsChanged)
         System.getProperty("chattranslator.selftest")?.let { dir ->
@@ -175,6 +181,15 @@ class ChatTranslator(configDir: Path) {
         flushNotices()
         selfTest?.onTick()
         keys.onTick()
+        book.onTick()
+    }
+
+    /** 機能の ON/OFF を切り替えて保存し、結果を表示する。@return 切り替え後の状態 */
+    fun toggle(feature: Feature): Boolean {
+        val on = !TranslatorConfig[feature.setting]
+        TranslatorConfig.update(feature.setting, on)
+        showToggle(feature.label, on)
+        return on
     }
 
     /** ON/OFF 切り替えの結果を画面下部に表示する */

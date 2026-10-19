@@ -35,7 +35,10 @@ class NeoForgeEntry(modBus: IEventBus, container: ModContainer) {
             mod.keys.mappings.forEach { ev.register(it) }
         }
         val gameBus = NeoForge.EVENT_BUS
-        gameBus.addListener(ScreenEvent.KeyPressed.Pre::class.java) { ev -> mod.keys.onScreenKey(ev.screen, ev.keyEvent) }
+        gameBus.addListener(ScreenEvent.KeyPressed.Pre::class.java) { ev ->
+            // 取り消すと画面の既定の処理 (チャット欄の送信など) が動かない
+            if (mod.keys.onScreenKey(ev.screen, ev.keyEvent)) ev.isCanceled = true
+        }
         val commands = Commands<CommandSourceStack> { source, message -> source.sendSystemMessage(message) }
         gameBus.addListener(RegisterClientCommandsEvent::class.java) { commands.register(it.dispatcher, mod) }
 

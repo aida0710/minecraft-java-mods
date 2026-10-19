@@ -35,9 +35,10 @@ class TextUtilTest {
     }
 
     @Test
-    fun splitsHypixelChatPrefix() {
-        assertEquals("[MVP+] Steve" to "anyone want to do dungeons?", TextUtil.splitChatPrefix("[MVP+] Steve: anyone want to do dungeons?"))
-        assertEquals("Party > [VIP] Alex" to "ready", TextUtil.splitChatPrefix("Party > [VIP] Alex: ready"))
+    fun splitsHypixelAndVanillaChatPrefix() {
+        assertEquals("[MVP+] Steve: " to "anyone want to do dungeons?", TextUtil.splitChatPrefix("[MVP+] Steve: anyone want to do dungeons?"))
+        assertEquals("Party > [VIP] Alex: " to "ready", TextUtil.splitChatPrefix("Party > [VIP] Alex: ready"))
+        assertEquals("<Steve> " to "anyone want to do dungeons?", TextUtil.splitChatPrefix("<Steve> anyone want to do dungeons?"))
         assertEquals("" to "You found a Rare Drop!", TextUtil.splitChatPrefix("You found a Rare Drop!"))
     }
 }

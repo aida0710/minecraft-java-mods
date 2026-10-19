@@ -69,7 +69,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
     override fun init() {
         pendingEdits.clear()
         refreshers.clear()
-        val b = MenuTabBar.builder(tabManager, width).addTabs(GeneralTab(), EngineTab(), DictionaryTab(), CacheTab(), BackupTab()).build()
+        val b = MenuTabBar.builder(tabManager, width).addTabs(GeneralTab(), SendTab(), EngineTab(), DictionaryTab(), CacheTab(), BackupTab()).build()
         bar = b
         addRenderableWidget(b)
         val footer = layout.addToFooter(LinearLayout.horizontal().spacing(8))
@@ -214,6 +214,15 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         return btn
     }
 
+    /** 言語の選択ボタン (リストでは「日本語 — Japanese」の形で表示し、言語コードでも絞り込める) */
+    private fun languageDropdown(label: Component, codes: List<String>, value: String, width: Int = HALF, onChange: (String) -> Unit): Button =
+        dropdown(
+            label, { codes }, value, { Component.literal(Languages.displayName(it)) }, width,
+            menuName = { Component.literal(Languages.menuName(it)) },
+            searchText = { Languages.menuName(it) + " " + it },
+            onChange = onChange,
+        )
+
     private fun width() = width
     private fun height() = height
 
@@ -258,14 +267,11 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         init {
             val c = cfg()
             val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
-            val sources = listOf(Languages.AUTO) + Languages.ALL.map { it.code }
-            val langName = { code: String -> Component.literal(Languages.displayName(code)) }
-            val menuName = { code: String -> Component.literal(Languages.menuName(code)) }
-            val search = { code: String -> Languages.menuName(code) + " " + code }
-            rows.addChild(dropdown(T.tr("settings.source"), { sources }, c.sourceCode, langName, menuName = menuName, searchText = search) {
+            val codes = Languages.ALL.map { it.code }
+            rows.addChild(languageDropdown(T.tr("settings.source"), listOf(Languages.AUTO) + codes, c.sourceCode) {
                 TranslatorConfig.update(TranslatorConfig.sourceCode, it)
             })
-            rows.addChild(dropdown(T.tr("settings.target"), { Languages.ALL.map { it.code } }, c.targetCode, langName, menuName = menuName, searchText = search) {
+            rows.addChild(languageDropdown(T.tr("settings.target"), codes, c.targetCode) {
                 TranslatorConfig.update(TranslatorConfig.targetCode, it)
             })
             rows.addChild(toggle(T.tr("settings.chat"), c.chatEnabled) { TranslatorConfig.update(TranslatorConfig.chatEnabled, it) })
@@ -282,12 +288,46 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             rows.addChild(toggle(T.tr("settings.show_original"), c.tooltipShowOriginal, tooltip = T.tr("settings.show_original.tooltip")) {
                 TranslatorConfig.update(TranslatorConfig.tooltipShowOriginal, it)
             })
+            rows.addChild(toggle(T.tr("settings.book"), c.bookEnabled, tooltip = T.tr("settings.book.tooltip")) {
+                TranslatorConfig.update(TranslatorConfig.bookEnabled, it)
+            })
+            rows.addChild(toggle(T.tr("settings.send"), c.sendEnabled, tooltip = T.tr("settings.send.tooltip")) {
+                TranslatorConfig.update(TranslatorConfig.sendEnabled, it)
+            })
             val uiName = { code: String -> if (code == T.AUTO) T.tr("settings.uilang.auto") else Component.literal(T.UI_LANGUAGE_NAMES.getValue(code)) }
             rows.full(dropdown(T.tr("settings.uilang"), { listOf(T.AUTO) + T.UI_LANGUAGES }, c.uiLanguage.takeIf { it in T.UI_LANGUAGES } ?: T.AUTO, uiName, FULL) {
                 TranslatorConfig.update(TranslatorConfig.uiLanguage, it)
-                reopen(0)
+                reopen(TAB_GENERAL)
             }.also { it.setTooltip(Tooltip.create(T.tr("settings.uilang.tooltip"))) })
             rows.full(note(T.tr("settings.general.note")))
+        }
+    }
+
+    /** 自分が送信するチャットの翻訳 */
+    private inner class SendTab : GridLayoutTab(T.tr("settings.tab.send")) {
+        init {
+            val c = cfg()
+            val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
+            rows.full(toggle(T.tr("settings.send"), c.sendEnabled, FULL, T.tr("settings.send.tooltip")) {
+                TranslatorConfig.update(TranslatorConfig.sendEnabled, it)
+            })
+            val codes = Languages.ALL.map { it.code }
+            rows.addChild(languageDropdown(T.tr("settings.send.source"), codes, c.sendSourceCode) {
+                TranslatorConfig.update(TranslatorConfig.sendSourceCode, it)
+            })
+            rows.addChild(languageDropdown(T.tr("settings.send.target"), codes, c.sendTargetCode) {
+                TranslatorConfig.update(TranslatorConfig.sendTargetCode, it)
+            })
+            rows.addChild(cycle(T.tr("settings.send.format"), SendFormat.entries, c.sendFormat, { T.tr("settings.send.format.${it.name.lowercase()}") }) {
+                TranslatorConfig.update(TranslatorConfig.sendFormat, it)
+            })
+            rows.addChild(toggle(T.tr("settings.send.confirm"), c.sendConfirm, tooltip = T.tr("settings.send.confirm.tooltip")) {
+                TranslatorConfig.update(TranslatorConfig.sendConfirm, it)
+            })
+            rows.full(field(T.tr("settings.send.commands"), c.sendCommands.joinToString(", "), FULL) { text ->
+                TranslatorConfig.update(TranslatorConfig.sendCommands, text.split(',').map { it.trim() }.filter { it.isNotEmpty() })
+            })
+            rows.full(note(T.tr("settings.send.note")))
         }
     }
 
@@ -299,7 +339,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
             rows.full(dropdown(T.tr("settings.engine"), { ProviderType.entries }, c.provider, { it.label }, FULL) {
                 TranslatorConfig.update(TranslatorConfig.provider, it)
-                reopen(1)
+                reopen(TAB_ENGINE)
             })
             rows.full(label({
                 val status = T.tr("settings.status", mod.engineStatus())
@@ -398,7 +438,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             rows.addChild(button(T.tr("settings.dict.folder")) { Blaze3D.openPath(mod.dataDir.resolve("dictionaries")) })
             rows.full(button(T.tr("settings.dict.reload"), FULL) {
                 d.load()
-                reopen(2)
+                reopen(TAB_DICTIONARY)
             })
             rows.full(note(T.tr("settings.dict.note")))
         }
@@ -454,7 +494,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             if (!sections.any) return
             backupResult = runCatching { T.tr("settings.backup.exported", mod.backup.export(sections).fileName.toString()) }
                 .getOrElse { T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName).withStyle(ChatFormatting.RED) }
-            reopen(4)
+            reopen(TAB_BACKUP)
         }
 
         private fun import() {
@@ -464,12 +504,19 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
                 T.tr("settings.backup.imported", path.fileName.toString(), T.onOff(r.language), r.dictionaries, "%,d".format(r.cacheEntries))
             }.getOrElse { T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName).withStyle(ChatFormatting.RED) }
             // 表示言語が変わることがあるので開き直す
-            reopen(4)
+            reopen(TAB_BACKUP)
         }
     }
 
     companion object {
-        const val TAB_COUNT = 5
+        // タブの並び (開き直すときに同じタブを開く)
+        const val TAB_GENERAL = 0
+        const val TAB_SEND = 1
+        const val TAB_ENGINE = 2
+        const val TAB_DICTIONARY = 3
+        const val TAB_CACHE = 4
+        const val TAB_BACKUP = 5
+        const val TAB_COUNT = 6
         /** 開き直しても残すバックアップタブの状態 (含める項目と最後の結果) */
         private var backupSections = Backup.Sections()
         private var backupResult: Component? = null

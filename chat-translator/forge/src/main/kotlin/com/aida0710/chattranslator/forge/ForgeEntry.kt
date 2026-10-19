@@ -20,6 +20,7 @@ import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
 import net.minecraftforge.fml.loading.FMLPaths
 import java.util.function.Consumer
+import java.util.function.Predicate
 
 /** Forge の入口。Forge のイベントを [ChatTranslator] に渡す */
 @Mod(ChatTranslator.MODID)
@@ -33,7 +34,8 @@ class ForgeEntry(context: FMLJavaModLoadingContext) {
 
         KeyMapping.Category.register(mod.keys.category.id())
         RegisterKeyMappingsEvent.BUS.addListener { ev -> mod.keys.mappings.forEach { ev.register(it) } }
-        ScreenEvent.KeyPressed.Pre.BUS.addListener(Consumer { ev -> mod.keys.onScreenKey(ev.screen, ev.info) })
+        // true を返すと取り消しになり、画面の既定の処理 (チャット欄の送信など) が動かない
+        ScreenEvent.KeyPressed.Pre.BUS.addListener(Predicate { ev -> mod.keys.onScreenKey(ev.screen, ev.info) })
         val commands = Commands<CommandSourceStack> { source, message -> source.sendSystemMessage(message) }
         RegisterClientCommandsEvent.BUS.addListener { commands.register(it.dispatcher, mod) }
 

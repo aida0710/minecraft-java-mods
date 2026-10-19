@@ -16,7 +16,7 @@ import java.util.Optional
  *             行末の [原文] / [訳] をクリックすると切り替わる。
  *  - APPEND:  原文の下に訳文を追加する。
  */
-class ChatHandler(private val translator: Translator) {
+class ChatHandler(private val translator: Translator, private val isOwnMessage: (String) -> Boolean = { false }) {
 
     /** 切り替え用に原文と訳文を保持する。描画スレッドからのみ触る */
     private class Entry(val original: Component, val translated: Component, var current: Component)
@@ -44,7 +44,8 @@ class ChatHandler(private val translator: Translator) {
         val raw = TextUtil.stripFormatting(message.string)
         val lines = raw.split('\n')
             .map { TextUtil.splitChatPrefix(it) }
-            .filter { (_, body) -> TextUtil.looksTranslatable(body, cfg.minLength) && !translator.isSkipped(body) }
+            // 自分が翻訳して送った発言がサーバーから戻ってきたものは訳し戻さない
+            .filter { (_, body) -> TextUtil.looksTranslatable(body, cfg.minLength) && !translator.isSkipped(body) && !isOwnMessage(body) }
         if (lines.isEmpty()) return null
 
         // 複数行メッセージは一部の行だけ書き換えると装飾が崩れるため追加表示にする
@@ -89,7 +90,7 @@ class ChatHandler(private val translator: Translator) {
         val id = nextId++
         val hover = HoverEvent.ShowText(T.tr("chat.original_prefix").withStyle(ChatFormatting.GRAY).append(original.copy()))
         // "[MVP+] Name: " の部分は原文の装飾のまま残し、本文は原文本文の先頭の装飾を引き継ぐ
-        val (head, bodyStyle, bodyCodes) = splitStyled(original, if (prefix.isEmpty()) 0 else prefix.length + 2)
+        val (head, bodyStyle, bodyCodes) = splitStyled(original, prefix.length)
         val component = Component.empty()
             .append(head)
             .append(Component.literal(bodyCodes + translated).withStyle(bodyStyle.withHoverEvent(hover)))

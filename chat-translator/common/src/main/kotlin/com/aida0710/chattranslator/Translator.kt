@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
- * 翻訳のキュー管理。チャットとツールチップでキューを分け、
+ * 翻訳のキュー管理。チャットと、表示中に裏で訳すもの (ツールチップ・本) でキューを分け、
  * ツールチップの大量リクエストでチャット翻訳が詰まらないようにする。
  */
 class Translator(
@@ -20,7 +20,7 @@ class Translator(
     private val failed = ConcurrentHashMap<String, Long>()
 
     private val chatExecutor = executor("chat", 256)
-    private val tooltipExecutor = executor("tooltip", 64)
+    private val backgroundExecutor = executor("background", 64)
 
     private fun executor(name: String, capacity: Int) = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -45,17 +45,24 @@ class Translator(
     }
 
     /** 辞書またはキャッシュにあれば即座に返す。無ければ null。 */
-    fun cached(text: String): String? = dictionaries.lookup(text) ?: cache.get(key(text))
+    fun cached(text: String, cfg: TranslatorConfig.Values = TranslatorConfig.current): String? = dictionaries.lookup(text) ?: cache.get(key(text, cfg))
 
     fun isSkipped(text: String): Boolean = dictionaries.shouldSkip(text)
 
-    /** チャット用: 完了時にコールバックを (キャッシュヒット時は呼び出し元、それ以外は翻訳スレッドから) 呼ぶ */
-    fun translateChat(text: String, onSuccess: (String) -> Unit, onFailure: (net.minecraft.network.chat.Component) -> Unit) {
-        // 設定 (言語・エンジン) は依頼した時点のものを使う (処理待ちの間に設定が変わっても混ざらないように)
-        val cfg = TranslatorConfig.current
-        cached(text)?.let { onSuccess(it); return }
+    /**
+     * チャット用: 完了時にコールバックを (キャッシュヒット時は呼び出し元、それ以外は翻訳スレッドから) 呼ぶ。
+     * 設定 (言語・エンジン) は依頼した時点の [cfg] を使う (処理待ちの間に設定が変わっても混ざらないように)。
+     * 送信するチャットは翻訳元・翻訳先を入れ替えた cfg (TranslatorConfig.Values.forSending) を渡す
+     */
+    fun translateChat(
+        text: String,
+        onSuccess: (String) -> Unit,
+        onFailure: (net.minecraft.network.chat.Component) -> Unit,
+        cfg: TranslatorConfig.Values = TranslatorConfig.current,
+    ) {
+        cached(text, cfg)?.let { onSuccess(it); return }
         // エンジンの準備ができていなければ翻訳しない (原文のまま)
-        if (!isReady()) { onFailure(notReadyReason()); return }
+        if (!isReady(cfg)) { onFailure(notReadyReason(cfg)); return }
         try {
             chatExecutor.execute {
                 runCatching { translateNow(text, cfg) }
@@ -72,10 +79,10 @@ class Translator(
     }
 
     /**
-     * ツールチップ用: キャッシュにあれば返し、無ければ非同期に翻訳を予約して null を返す。
+     * ツールチップ・本のページ用: キャッシュにあれば返し、無ければ非同期に翻訳を予約して null を返す。
      * 毎フレーム呼ばれる前提なので重複予約・失敗直後の再試行はしない。
      */
-    fun translateTooltipLine(text: String): String? {
+    fun translateInBackground(text: String): String? {
         cached(text)?.let { return it }
         if (!isReady()) return null
         val cfg = TranslatorConfig.current
@@ -89,13 +96,13 @@ class Translator(
                     failed.remove(k)
                 } catch (e: Exception) {
                     failed[k] = System.currentTimeMillis()
-                    ChatTranslator.LOGGER.debug("Tooltip translation failed: {}", e.toString())
+                    ChatTranslator.LOGGER.debug("Background translation failed: {}", e.toString())
                 } finally {
                     pending.remove(k)
                 }
             }
             try {
-                tooltipExecutor.execute(task)
+                backgroundExecutor.execute(task)
             } catch (_: RejectedExecutionException) {
                 // キューが満杯なら捨て、次のフレームで再予約できるようにする
                 pending.remove(k)
@@ -132,7 +139,7 @@ class Translator(
 
     fun shutdown() {
         chatExecutor.shutdownNow()
-        tooltipExecutor.shutdownNow()
+        backgroundExecutor.shutdownNow()
         cache.saveIfDirty()
     }
 
