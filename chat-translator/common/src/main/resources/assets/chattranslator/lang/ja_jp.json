@@ -55,6 +55,7 @@
   "chattranslator.download.progress": "%s: %s%% (%s / %s MB)",
   "chattranslator.llama.install_done": "内蔵 LLM のインストールが完了しました",
   "chattranslator.llama.install_failed": "内蔵 LLM のインストールに失敗しました: %s",
+  "chattranslator.llama.github_rate_limited": "GitHub の API の利用回数の上限 (同じ IP から 1 時間に 60 回) に達したため、llama.cpp の照合値を取得できませんでした。約 %s 分後にもう一度お試しください。builtin.llamaBuild を既定の %s に戻せば、待たずにインストールできます",
   "chattranslator.llama.failed": "失敗: %s",
   "chattranslator.llama.downloading": "%s をダウンロードしています…",
   "chattranslator.llama.starting": "内蔵 LLM を起動しています…",
