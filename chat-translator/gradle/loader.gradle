@@ -60,6 +60,15 @@ tasks.named('shadowJar') {
     // kotlin-stdlib が依存する注釈ライブラリは Minecraft 側にもあり、同梱すると衝突しうる
     exclude 'org/intellij/**', 'org/jetbrains/annotations/**'
     manifest.attributes('Implementation-Version': mod_version)
+
+    // ライセンスの表記: この mod の Apache-2.0 と、同梱したライブラリの版・ライセンス (licenses/)
+    def libraryVersions = [kotlin_version: kotlin_version, night_config_version: night_config_version]
+    inputs.properties libraryVersions
+    from(rootProject.file('../LICENSE')) { into 'META-INF' }
+    from(rootProject.file('licenses')) {
+        into 'META-INF/licenses'
+        filesMatching('THIRD-PARTY.txt') { expand libraryVersions }
+    }
 }
 
 tasks.named('assemble') { dependsOn 'shadowJar' }

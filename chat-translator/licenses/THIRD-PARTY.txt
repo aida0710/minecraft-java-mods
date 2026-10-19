@@ -1,0 +1,28 @@
+Chat Translator
+Copyright 2026 aida0710
+Licensed under the Apache License, Version 2.0 (META-INF/LICENSE in the jar).
+Source code: https://github.com/aida0710/minecraft-java-mods
+
+This jar bundles the following libraries. The build script
+(chat-translator/gradle/loader.gradle) moves their classes to another
+package name (relocation) and does not change them otherwise.
+
+Kotlin standard library ${kotlin_version}
+  License: Apache License 2.0 (the same text as META-INF/LICENSE)
+  Source code: https://github.com/JetBrains/kotlin
+  Relocated to: com.aida0710.chattranslator.shadow.kotlin
+
+NightConfig core and toml ${night_config_version}
+  License: GNU Lesser General Public License v3.0
+           (META-INF/licenses/LGPL-3.0.txt, which adds permissions to
+           the GNU General Public License v3.0 in META-INF/licenses/GPL-3.0.txt)
+  Source code: https://github.com/TheElectronWill/night-config
+  Relocated to: com.aida0710.chattranslator.shadow.nightconfig
+  To use a modified NightConfig, build it, change night_config_version in
+  chat-translator/gradle.properties to that build, and build this mod again
+  from the source code above.
+
+Not bundled. Downloaded only when you press "Install" for the built-in LLM
+in the settings screen:
+  llama.cpp (MIT License): https://github.com/ggml-org/llama.cpp
+  TranslateGemma (Gemma Terms of Use): https://ai.google.dev/gemma/terms

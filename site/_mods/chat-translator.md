@@ -1,6 +1,9 @@
 ---
 title: Chat Translator
 order: 1
+# 公開している最新の版。Release のタグ (chat-translator-v<版>) とダウンロードの行き先に使う
+version: "0.2.0"
+icon: /assets/chat-translator/icon.svg
 # 一覧のカードの名前の色 (Minecraft のレアリティの色に合わせる)
 color: "#FF55FF"
 minecraft: "26.3"

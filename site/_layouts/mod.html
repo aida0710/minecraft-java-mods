@@ -4,15 +4,17 @@ layout: default
 <section class="sky">
   <div class="sky-inner sky-inner--mod">
     <div class="sky-text">
+      {% if page.icon %}<img class="sky-icon" src="{{ page.icon | relative_url }}" alt="" width="96" height="96">{% endif %}
       <h1 class="pixel-title">{{ page.title }}</h1>
       <p class="sky-lead" data-lang="ja">{{ page.summary.ja }}</p>
       <p class="sky-lead" data-lang="en">{{ page.summary.en }}</p>
       <p class="sky-meta">
+        {% if page.version %}<span class="badge">v{{ page.version }}</span>{% endif %}
         <span class="badge">Minecraft {{ page.minecraft }}</span>
         {% for loader in page.loaders %}<span class="badge">{{ loader }}</span>{% endfor %}
       </p>
       <p class="sky-actions">
-        <a class="mc-button" href="https://github.com/{{ site.repository }}/releases"><span data-lang="ja">ダウンロード</span><span data-lang="en">Download</span></a>
+        <a class="mc-button" href="https://github.com/{{ site.repository }}/releases{% if page.version %}/tag/{{ page.source }}-v{{ page.version }}{% endif %}"><span data-lang="ja">ダウンロード</span><span data-lang="en">Download</span></a>
         <a class="mc-button" href="https://github.com/{{ site.repository }}/tree/main/{{ page.source }}"><span data-lang="ja">ソースコード</span><span data-lang="en">Source code</span></a>
       </p>
     </div>

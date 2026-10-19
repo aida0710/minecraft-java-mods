@@ -3,14 +3,15 @@
   "id": "chattranslator",
   "version": "${mod_version}",
   "name": "Chat Translator",
-  "description": "Translates chat and item tooltips with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs. チャットとアイテムの説明文を翻訳します (日本語 / English / 简体中文 UI)。",
+  "description": "Translates chat, item tooltips and books, and sends your own chat translated, with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs. チャット・アイテムの説明・本を翻訳し、自分の発言も翻訳して送れます (日本語 / English / 简体中文 UI)。",
   "authors": ["aida0710"],
   "contact": {
     "homepage": "https://aida0710.github.io/minecraft-java-mods/chat-translator/",
     "sources": "https://github.com/aida0710/minecraft-java-mods",
     "issues": "https://github.com/aida0710/minecraft-java-mods/issues"
   },
-  "license": "All Rights Reserved",
+  "license": "Apache-2.0",
+  "icon": "assets/chattranslator/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": ["com.aida0710.chattranslator.fabric.FabricEntry"],

@@ -171,6 +171,13 @@ a {
   text-shadow: 0.06em 0.06em 0 var(--text-shadow);
 }
 
+/* mod のアイコン。題名の上に置き、題名の文字と同じ向きに影を落とす (横に並べると左の列が広がり、チャット欄の例が折り返す) */
+.sky-icon {
+  width: clamp(64px, 9vw, 96px);
+  margin-bottom: 16px;
+  filter: drop-shadow(5px 5px 0 var(--text-shadow));
+}
+
 .sky-lead {
   max-width: 34em;
   margin: 0 0 20px;
@@ -364,6 +371,14 @@ a {
   margin-bottom: 4px;
   font-size: 22px;
   text-shadow: 2px 2px 0 #3f153f;
+}
+
+.mod-card-icon {
+  display: inline-block;
+  width: 1.4em;
+  height: 1.4em;
+  margin-right: 0.35em;
+  vertical-align: -0.35em;
 }
 
 .lore {

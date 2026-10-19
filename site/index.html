@@ -20,9 +20,10 @@ title: Minecraft Java Mods
       <a class="mod-card tooltip-box" href="{{ mod.url | relative_url }}">
         <img class="mod-card-shot" src="{{ mod.thumbnail | relative_url }}" alt="" width="1280" height="720" loading="lazy">
         <span class="mod-card-body">
-          <span class="mod-card-name" style="color: {{ mod.color }}">{{ mod.title }}</span>
+          <span class="mod-card-name" style="color: {{ mod.color }}">{% if mod.icon %}<img class="mod-card-icon" src="{{ mod.icon | relative_url }}" alt="" width="32" height="32">{% endif %}{{ mod.title }}</span>
           <span class="lore" data-lang="ja">{{ mod.summary.ja }}</span>
           <span class="lore" data-lang="en">{{ mod.summary.en }}</span>
+          {% if mod.version %}<span class="stat-line"><span class="stat-key" data-lang="ja">バージョン</span><span class="stat-key" data-lang="en">Version</span> {{ mod.version }}</span>{% endif %}
           <span class="stat-line"><span class="stat-key">Minecraft</span> {{ mod.minecraft }}</span>
           <span class="stat-line"><span class="stat-key" data-lang="ja">ローダー</span><span class="stat-key" data-lang="en">Loaders</span> {{ mod.loaders | join: " / " }}</span>
         </span>

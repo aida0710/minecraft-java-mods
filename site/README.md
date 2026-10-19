@@ -14,6 +14,8 @@ https://aida0710.github.io/minecraft-java-mods/ のソース。`main` の `site/
 | `order` | 一覧の並び順 (小さいほど先) |
 | `color` | 一覧のカードの名前の色 (Minecraft のレアリティの色: `#FFFFFF` `#55FF55` `#5555FF` `#AA00AA` `#FFAA00` `#FF55FF` など) |
 | `minecraft` / `loaders` | 対応する Minecraft の版とローダー |
+| `version` | 公開している最新の版。「ダウンロード」は Release のタグ `<source>-v<version>` を開く (無ければ Release の一覧) |
+| `icon` | mod のアイコン (正方形。SVG か PNG)。一覧のカード・ページの見出し・ブラウザのタブに出す |
 | `source` | リポジトリの中の mod のフォルダ (ソースコードへのリンクに使う) |
 | `thumbnail` | 一覧のカードの画像 (16:9) |
 | `summary.ja` / `summary.en` | 1 文の説明 |

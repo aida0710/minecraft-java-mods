@@ -1,6 +1,6 @@
 modLoader="javafml"
 loaderVersion="[66,)"
-license="All Rights Reserved"
+license="Apache-2.0"
 issueTrackerURL="https://github.com/aida0710/minecraft-java-mods/issues"
 clientSideOnly=true
 
@@ -10,9 +10,10 @@ version="${mod_version}"
 displayName="Chat Translator"
 authors="aida0710"
 displayURL="https://aida0710.github.io/minecraft-java-mods/chat-translator/"
+logoFile="assets/chattranslator/icon.png"
 description='''
-Translates chat and item tooltips with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
-チャットとアイテムの説明文を翻訳します (日本語 / English / 简体中文 UI)。
+Translates chat, item tooltips and books, and sends your own chat translated, with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
+チャット・アイテムの説明・本を翻訳し、自分の発言も翻訳して送れます (日本語 / English / 简体中文 UI)。
 '''
 
 [[dependencies.chattranslator]]
