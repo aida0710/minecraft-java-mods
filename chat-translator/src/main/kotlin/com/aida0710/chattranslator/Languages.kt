@@ -60,6 +60,12 @@ object Languages {
 
     fun displayName(code: String): String = if (code == AUTO) T.s("lang.auto") else byCode[code]?.native ?: code
 
+    /** 選択リスト用の名前 (例: 日本語 — Japanese) */
+    fun menuName(code: String): String {
+        val lang = byCode[code] ?: return displayName(code)
+        return if (lang.native == lang.english) lang.native else "${lang.native} — ${lang.english}"
+    }
+
     fun englishName(code: String): String = if (code == AUTO) "the source language" else byCode[code]?.english ?: code
 
     /** 文字 c がその文字体系に属するか */

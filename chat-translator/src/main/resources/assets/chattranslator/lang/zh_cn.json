@@ -8,6 +8,7 @@
 
   "chattranslator.on": "开",
   "chattranslator.off": "关",
+  "chattranslator.done": "完成",
   "chattranslator.lang.auto": "自动检测",
 
   "chattranslator.provider.builtin": "内置 LLM",
@@ -152,6 +153,31 @@
   "chattranslator.settings.cache.now": "当前：%s 条 / 文件 %s KB",
   "chattranslator.settings.cache.clear": "清除缓存",
   "chattranslator.settings.cache.note": "更换引擎、模型或语言时会自动使用独立的缓存",
+
+  "chattranslator.dropdown.search": "输入文字以筛选…",
+  "chattranslator.dropdown.none": "（无）",
+  "chattranslator.settings.uilang": "模组显示语言",
+  "chattranslator.settings.uilang.auto": "跟随 Minecraft",
+  "chattranslator.settings.uilang.tooltip": "本模组界面和消息的语言。按键设置界面中的按键名称仍跟随 Minecraft 的语言",
+
+  "chattranslator.settings.tab.backup": "备份",
+  "chattranslator.settings.backup.include": "导出/导入的内容：",
+  "chattranslator.settings.backup.language": "语言设置",
+  "chattranslator.settings.backup.dictionaries": "词典",
+  "chattranslator.settings.backup.dictionaries.tooltip": "已启用的词典、用户词典和自制词典文件（不含内置的 Hypixel 词典）
+导入时，用户词典会合并到当前内容，其他同名词典会被替换",
+  "chattranslator.settings.backup.cache": "缓存",
+  "chattranslator.settings.backup.cache.tooltip": "翻译缓存（当前 %s 条）。导入后会添加到当前缓存",
+  "chattranslator.settings.backup.export": "导出",
+  "chattranslator.settings.backup.file": "文件",
+  "chattranslator.settings.backup.import": "导入",
+  "chattranslator.settings.backup.folder": "打开导出文件夹",
+  "chattranslator.settings.backup.where": "保存位置：config/chattranslator/exports",
+  "chattranslator.settings.backup.note": "不会导出 API 密钥和引擎设置。要导入其他电脑的文件，请将其放入该文件夹",
+  "chattranslator.settings.backup.exported": "已导出到 %s",
+  "chattranslator.settings.backup.imported": "已导入 %s（语言：%s，词典：%s 个，缓存：%s 条）",
+  "chattranslator.settings.backup.failed": "失败：%s",
+  "chattranslator.cmd.import.not_found": "config/chattranslator/exports 中没有 %s",
 
   "chattranslator.dictedit.title": "用户词典",
   "chattranslator.dictedit.term": "词语",

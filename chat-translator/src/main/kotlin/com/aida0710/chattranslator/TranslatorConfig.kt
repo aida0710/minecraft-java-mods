@@ -19,6 +19,7 @@ object TranslatorConfig {
         val minLength: Int,
         val sourceCode: String,
         val targetCode: String,
+        val uiLanguage: String,
         val provider: ProviderType,
         val temperature: Double,
         val timeoutSeconds: Int,
@@ -97,6 +98,7 @@ object TranslatorConfig {
     val minLength: ForgeConfigSpec.IntValue
     val sourceCode: ForgeConfigSpec.ConfigValue<String>
     val targetCode: ForgeConfigSpec.ConfigValue<String>
+    val uiLanguage: ForgeConfigSpec.ConfigValue<String>
     val provider: ForgeConfigSpec.EnumValue<ProviderType>
     val temperature: ForgeConfigSpec.DoubleValue
     val timeout: ForgeConfigSpec.IntValue
@@ -149,6 +151,7 @@ object TranslatorConfig {
         b.push("language")
         sourceCode = b.comment("翻訳元の言語コード (auto = 自動検出。内蔵 LLM では英語として扱う)").define("source", "en")
         targetCode = b.comment("翻訳先の言語コード").define("target", "ja")
+        uiLanguage = b.comment("mod の画面の表示言語 (auto = Minecraft に合わせる / en_us / ja_jp / zh_cn)").define("ui", T.AUTO)
         b.pop()
 
         b.push("engine")
@@ -241,6 +244,7 @@ object TranslatorConfig {
 
     fun reload() {
         current = read(defaults = false)
+        T.setUiLanguage(current.uiLanguage)
         listeners.forEach { it(current) }
     }
 
@@ -264,6 +268,7 @@ object TranslatorConfig {
             minLength = v(minLength),
             sourceCode = v(sourceCode),
             targetCode = v(targetCode),
+            uiLanguage = v(uiLanguage),
             provider = v(provider),
             temperature = v(temperature),
             timeoutSeconds = v(timeout),

@@ -8,6 +8,7 @@
 
   "chattranslator.on": "ON",
   "chattranslator.off": "OFF",
+  "chattranslator.done": "完了",
   "chattranslator.lang.auto": "自動検出",
 
   "chattranslator.provider.builtin": "内蔵 LLM",
@@ -152,6 +153,31 @@
   "chattranslator.settings.cache.now": "現在: %s 件 / ファイル %s KB",
   "chattranslator.settings.cache.clear": "キャッシュを削除",
   "chattranslator.settings.cache.note": "エンジン・モデル・言語を変えると、キャッシュは自動で別扱いになります",
+
+  "chattranslator.dropdown.search": "文字を入力して絞り込み…",
+  "chattranslator.dropdown.none": "(なし)",
+  "chattranslator.settings.uilang": "mod の表示言語",
+  "chattranslator.settings.uilang.auto": "Minecraft に合わせる",
+  "chattranslator.settings.uilang.tooltip": "この mod の画面とメッセージの言語。操作設定画面のキー名は Minecraft の言語のままです",
+
+  "chattranslator.settings.tab.backup": "バックアップ",
+  "chattranslator.settings.backup.include": "エクスポート / インポートする内容:",
+  "chattranslator.settings.backup.language": "言語設定",
+  "chattranslator.settings.backup.dictionaries": "辞書",
+  "chattranslator.settings.backup.dictionaries.tooltip": "有効な辞書、ユーザー辞書、自作の辞書ファイル (同梱の Hypixel 辞書は含めない)
+インポート時、ユーザー辞書は今の内容に追加し、ほかの辞書は同じ名前のものを置き換えます",
+  "chattranslator.settings.backup.cache": "キャッシュ",
+  "chattranslator.settings.backup.cache.tooltip": "翻訳キャッシュ (現在 %s 件)。インポートすると今のキャッシュに追加されます",
+  "chattranslator.settings.backup.export": "エクスポート",
+  "chattranslator.settings.backup.file": "ファイル",
+  "chattranslator.settings.backup.import": "インポート",
+  "chattranslator.settings.backup.folder": "エクスポートフォルダを開く",
+  "chattranslator.settings.backup.where": "保存先: config/chattranslator/exports",
+  "chattranslator.settings.backup.note": "API キーとエンジンの設定はエクスポートしません。別の PC のファイルを読み込むときは、フォルダに置いてください",
+  "chattranslator.settings.backup.exported": "%s にエクスポートしました",
+  "chattranslator.settings.backup.imported": "%s をインポートしました (言語: %s、辞書: %s 個、キャッシュ: %s 件)",
+  "chattranslator.settings.backup.failed": "失敗: %s",
+  "chattranslator.cmd.import.not_found": "config/chattranslator/exports に %s がありません",
 
   "chattranslator.dictedit.title": "ユーザー辞書",
   "chattranslator.dictedit.term": "語句",

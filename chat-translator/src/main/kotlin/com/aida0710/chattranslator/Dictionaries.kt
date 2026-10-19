@@ -43,10 +43,10 @@ class Dictionaries(private val dir: Path, private val itemNames: ItemNames) {
 
     /** 表示名。言語ファイルに chattranslator.dict.<id>.name があればそれを使い、無ければ JSON の name */
     fun displayName(pack: Pack): net.minecraft.network.chat.Component =
-        net.minecraft.network.chat.Component.translatableWithFallback("chattranslator.dict.${pack.id}.name", pack.name)
+        T.trOr("dict.${pack.id}.name", pack.name)
 
     fun description(pack: Pack): net.minecraft.network.chat.Component =
-        net.minecraft.network.chat.Component.translatableWithFallback("chattranslator.dict.${pack.id}.desc", pack.description)
+        T.trOr("dict.${pack.id}.desc", pack.description)
 
     fun lookup(text: String): String? = terms[text.trim()]
 
@@ -121,6 +121,40 @@ class Dictionaries(private val dir: Path, private val itemNames: ItemNames) {
         return true
     }
 
+    // ---- エクスポート / インポート ----
+
+    /** 同梱以外の辞書ファイルの中身 (id → JSON) */
+    fun exportPacks(): JsonObject = JsonObject().apply {
+        packs.filter { !it.builtin }.forEach { pack -> runCatching { add(pack.id, read(file(pack.id))) } }
+    }
+
+    /**
+     * 辞書を取り込む。ユーザー辞書は今の内容に足し合わせ、それ以外は同じ id のファイルを置き換える。
+     * 同梱辞書と、ファイル名に使えない id は無視する。戻り値は取り込んだ辞書の数
+     */
+    fun importPacks(imported: JsonObject): Int {
+        var count = 0
+        for ((id, value) in imported.entrySet()) {
+            if (id in BUILTIN || !ID_PATTERN.matches(id) || !value.isJsonObject) continue
+            val json = value.asJsonObject
+            if (id == USER) {
+                val user = runCatching { read(file(USER)) }.getOrElse { JsonObject() }
+                for (key in listOf("keep", "skip")) {
+                    val arr = user.getAsJsonArray(key) ?: JsonArray().also { user.add(key, it) }
+                    json.getAsJsonArray(key)?.forEach { e -> if (arr.none { it == e }) arr.add(e) }
+                }
+                val terms = user.getAsJsonObject("terms") ?: JsonObject().also { user.add("terms", it) }
+                json.getAsJsonObject("terms")?.entrySet()?.forEach { (k, v) -> terms.add(k, v) }
+                write(USER, user)
+            } else {
+                write(id, json)
+            }
+            count++
+        }
+        load()
+        return count
+    }
+
     // ---- ファイル入出力 ----
 
     private fun file(id: String) = dir.resolve("$id.json")
@@ -164,5 +198,6 @@ class Dictionaries(private val dir: Path, private val itemNames: ItemNames) {
     companion object {
         const val USER = "user"
         val BUILTIN = listOf("hypixel-skyblock")
+        private val ID_PATTERN = Regex("[A-Za-z0-9_\\-]{1,64}")
     }
 }

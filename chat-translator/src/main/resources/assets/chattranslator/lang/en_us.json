@@ -8,6 +8,7 @@
 
   "chattranslator.on": "ON",
   "chattranslator.off": "OFF",
+  "chattranslator.done": "Done",
   "chattranslator.lang.auto": "Auto-detect",
 
   "chattranslator.provider.builtin": "Built-in LLM",
@@ -152,6 +153,31 @@
   "chattranslator.settings.cache.now": "Now: %s entries / file %s KB",
   "chattranslator.settings.cache.clear": "Clear cache",
   "chattranslator.settings.cache.note": "Changing the engine, model or language keeps a separate cache automatically",
+
+  "chattranslator.dropdown.search": "Type to filter…",
+  "chattranslator.dropdown.none": "(none)",
+  "chattranslator.settings.uilang": "Mod language",
+  "chattranslator.settings.uilang.auto": "Same as Minecraft",
+  "chattranslator.settings.uilang.tooltip": "Language of this mod's screens and messages. Key binding names in the Controls screen follow Minecraft's language",
+
+  "chattranslator.settings.tab.backup": "Backup",
+  "chattranslator.settings.backup.include": "Include in export / import:",
+  "chattranslator.settings.backup.language": "Languages",
+  "chattranslator.settings.backup.dictionaries": "Dictionaries",
+  "chattranslator.settings.backup.dictionaries.tooltip": "Enabled dictionaries, the user dictionary and your own dictionary files (the bundled Hypixel dictionary is not included)
+On import the user dictionary is merged; other dictionaries with the same name are replaced",
+  "chattranslator.settings.backup.cache": "Cache",
+  "chattranslator.settings.backup.cache.tooltip": "Translation cache (%s entries now). Imported entries are added to the current cache",
+  "chattranslator.settings.backup.export": "Export",
+  "chattranslator.settings.backup.file": "File",
+  "chattranslator.settings.backup.import": "Import",
+  "chattranslator.settings.backup.folder": "Open export folder",
+  "chattranslator.settings.backup.where": "Saved in config/chattranslator/exports",
+  "chattranslator.settings.backup.note": "API keys and engine settings are not exported. To import a file from another PC, put it in the folder",
+  "chattranslator.settings.backup.exported": "Exported %s",
+  "chattranslator.settings.backup.imported": "Imported %s (languages: %s, dictionaries: %s, cache: %s entries)",
+  "chattranslator.settings.backup.failed": "Failed: %s",
+  "chattranslator.cmd.import.not_found": "File not found in config/chattranslator/exports: %s",
 
   "chattranslator.dictedit.title": "User Dictionary",
   "chattranslator.dictedit.term": "Term",

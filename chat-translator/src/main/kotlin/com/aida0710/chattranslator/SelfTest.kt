@@ -112,6 +112,27 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
                 log("after K in inventory: chatEnabled=${TranslatorConfig.current.chatEnabled}")
             }
             "status" -> log("engine=${ChatTranslator.instance.engineStatus()} ready=${ChatTranslator.instance.translator.isReady()}")
+            "popup" -> log((mc.gui.screen() as? SettingsScreen)?.popupState() ?: "not settings: ${mc.gui.screen()}")
+            "widgets" -> mc.gui.screen()?.children()?.filterIsInstance<net.minecraft.client.gui.components.AbstractWidget>()?.filter { it.visible }
+                ?.forEach { log("widget '${it.message.string}' x=${it.x} y=${it.y} w=${it.width} h=${it.height}") }
+            "mouse" -> {
+                val (x, y) = args[1].split(" ").map { it.toDouble() }
+                val ev = net.minecraft.client.input.MouseButtonEvent(x, y, net.minecraft.client.input.MouseButtonInfo(1, 0))
+                val s = mc.gui.screen()!!
+                log("child at=${s.getChildAt(x, y).orElse(null)?.let { (it as? net.minecraft.client.gui.components.AbstractWidget)?.message?.string ?: it.toString() }}")
+                log("click handled=${s.mouseClicked(ev, false)} focused=${s.focused}")
+                s.mouseReleased(ev)
+            }
+            "scroll" -> {
+                val (x, y, d) = args[1].split(" ").map { it.toDouble() }
+                mc.gui.screen()!!.mouseScrolled(x, y, 0.0, d)
+            }
+            "type" -> args[1].codePoints().forEach { mc.gui.screen()!!.charTyped(net.minecraft.client.input.CharacterEvent(it)) }
+            "key" -> mc.gui.screen()!!.keyPressed(net.minecraft.client.input.KeyEvent(args[1].toInt(), 0, 0))
+            "modlang" -> TranslatorConfig.update(TranslatorConfig.uiLanguage, args[1])
+            "config" -> TranslatorConfig.current.let { log("source=${it.sourceCode} target=${it.targetCode} ui=${it.uiLanguage} provider=${it.provider} dicts=${it.enabledDictionaries}") }
+            "cache" -> log("cache size=${ChatTranslator.instance.cache.size()}")
+            "cacheclear" -> ChatTranslator.instance.translator.clearCache()
             "close" -> mc.gui.setScreen(null)
             "screenshot" -> Screenshot.grab(mc.gameDirectory, args.getOrElse(1) { "selftest" } + ".png", mc.gameRenderer.mainRenderTarget(), 1) { log("screenshot: ${it.string}") }
             "holdkey" -> log("J held=${InputConstants.isKeyDown(InputConstants.KEY_J)}")

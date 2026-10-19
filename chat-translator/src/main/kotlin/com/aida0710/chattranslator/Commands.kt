@@ -30,6 +30,16 @@ object Commands {
         SharedSuggestionProvider.suggest(mod.dictionaries.userPack?.keep ?: emptyList(), builder)
     }
 
+    private fun exportFiles(mod: ChatTranslator) = SuggestionProvider<CommandSourceStack> { _, builder ->
+        SharedSuggestionProvider.suggest(mod.backup.files().map { it.fileName.toString() }, builder)
+    }
+
+    private fun export(src: CommandSourceStack, mod: ChatTranslator, name: String?) {
+        runCatching { mod.backup.export(Backup.Sections(), name) }
+            .onSuccess { reply(src, T.tr("settings.backup.exported", it.fileName.toString())) }
+            .onFailure { reply(src, T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName), ChatFormatting.RED) }
+    }
+
     fun register(dispatcher: CommandDispatcher<CommandSourceStack>, mod: ChatTranslator) {
         fun ok(block: (CommandContext<CommandSourceStack>) -> Unit): com.mojang.brigadier.Command<CommandSourceStack> =
             com.mojang.brigadier.Command { ctx -> block(ctx); 1 }
@@ -125,6 +135,20 @@ object Commands {
                     val c = TranslatorConfig.current
                     reply(ctx.source, T.tr("cmd.cache.info", mod.cache.size(), c.maxCacheEntries, mod.cache.fileSize() / 1024, T.onOff(c.cachePersist)))
                 })))
+            .then(literal("export")
+                .executes(ok { ctx -> export(ctx.source, mod, null) })
+                .then(argument("name", StringArgumentType.word()).executes(ok { ctx -> export(ctx.source, mod, StringArgumentType.getString(ctx, "name")) })))
+            .then(literal("import").then(argument("file", StringArgumentType.greedyString()).suggests(exportFiles(mod)).executes(ok { ctx ->
+                val name = StringArgumentType.getString(ctx, "file").trim()
+                val path = mod.backup.resolve(name) ?: mod.backup.resolve("$name.json")
+                if (path == null) {
+                    reply(ctx.source, T.tr("cmd.import.not_found", name), ChatFormatting.RED)
+                    return@ok
+                }
+                runCatching { mod.backup.import(path) }
+                    .onSuccess { r -> reply(ctx.source, T.tr("settings.backup.imported", path.fileName.toString(), T.onOff(r.language), r.dictionaries, "%,d".format(r.cacheEntries))) }
+                    .onFailure { reply(ctx.source, T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName), ChatFormatting.RED) }
+            })))
             .then(literal("pull").executes(ok { ctx ->
                 val c = TranslatorConfig.current
                 when (c.provider) {

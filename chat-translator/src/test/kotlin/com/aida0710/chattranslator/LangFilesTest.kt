@@ -27,7 +27,7 @@ class LangFilesTest {
         val dynamic = ProviderType.entries.map { "provider.${it.name.lowercase()}" } +
             ChatDisplayMode.entries.map { "settings.display.${it.name.lowercase()}" } +
             ModelPreset.entries.flatMap { listOf("model.${it.key}", "model.${it.key}.short") } +
-            listOf("on", "off")
+            listOf("on", "off", "settings.uilang.auto")
         return (direct + conditional + dynamic).map { "chattranslator.$it" }.toSet()
     }
 

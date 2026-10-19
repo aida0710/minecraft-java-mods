@@ -39,6 +39,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
     val itemNames = ItemNames(dataDir.resolve("skyblock_items.json"))
     val dictionaries = Dictionaries(dataDir.resolve("dictionaries"), itemNames)
     val cache = TranslationCache(dataDir.resolve("cache.json"))
+    val backup = Backup(dataDir.resolve("exports"), cache, dictionaries)
     val ollama = OllamaManager { message, progress -> queueNotice(message, progress) }
     val llama = LlamaServerManager(dataDir.resolve("llama")) { message, progress -> queueNotice(message, progress) }
     lateinit var translator: Translator

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.Blaze3D
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.ContainerObjectSelectionList
 import net.minecraft.client.gui.components.CycleButton
@@ -24,11 +25,14 @@ import net.minecraft.client.gui.narration.NarratableEntry
 import net.minecraft.client.gui.navigation.ScreenRectangle
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen
+import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
+import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
 import net.minecraftforge.client.ConfigScreenHandler
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
+import java.nio.file.Path
 
 /** 内蔵 LLM で選べるモデル */
 enum class ModelPreset(val key: String, val url: String, val sha256: String, val bytes: Long) {
@@ -67,7 +71,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
     override fun init() {
         pendingEdits.clear()
         refreshers.clear()
-        val b = MenuTabBar.builder(tabManager, width).addTabs(GeneralTab(), EngineTab(), DictionaryTab(), CacheTab()).build()
+        val b = MenuTabBar.builder(tabManager, width).addTabs(GeneralTab(), EngineTab(), DictionaryTab(), CacheTab(), BackupTab()).build()
         bar = b
         addRenderableWidget(b)
         val footer = layout.addToFooter(LinearLayout.horizontal().spacing(8))
@@ -75,9 +79,9 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             commitEdits()
             minecraft.gui.setScreen(KeyBindsScreen(this, minecraft.options))
         }.width(150).build())
-        footer.addChild(Button.builder(CommonComponents.GUI_DONE) { onClose() }.width(150).build())
+        footer.addChild(Button.builder(T.tr("done")) { onClose() }.width(150).build())
         layout.visitWidgets { addRenderableWidget(it) }
-        b.selectTab(initialTab.coerceIn(0, 3), false)
+        b.selectTab(initialTab.coerceIn(0, TAB_COUNT - 1), false)
         repositionElements()
     }
 
@@ -88,13 +92,63 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         tabManager.setTabArea(ScreenRectangle(0, top, width, height - layout.footerHeight - top))
         layout.headerHeight = top
         layout.arrangeElements()
+        popup = null
     }
 
-    override fun keyPressed(event: KeyEvent): Boolean = bar?.keyPressed(event) == true || super.keyPressed(event)
+    // ---- 開いている選択リスト (最前面に描画し、入力を優先して受け取る) ----
+
+    private var popup: DropdownPopup<*>? = null
+
+    /** 自動テスト用 */
+    internal fun popupState() = popup?.toString() ?: "none"
+
+    override fun extractRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, a: Float) {
+        val p = popup
+        // リストの上にマウスがあるときは、下のボタンが反応 (ハイライト・ツールチップ) しないようにする
+        val hidden = p != null && p.isMouseOver(mouseX.toDouble(), mouseY.toDouble())
+        super.extractRenderState(g, if (hidden) -1 else mouseX, if (hidden) -1 else mouseY, a)
+        if (p != null) {
+            g.nextStratum()
+            p.extract(g, mouseX, mouseY)
+        }
+    }
+
+    override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
+        val p = popup ?: return super.mouseClicked(event, doubleClick)
+        if (!p.mouseClicked(event.x(), event.y()) && popup === p) popup = null
+        return true
+    }
+
+    override fun mouseReleased(event: MouseButtonEvent): Boolean = popup != null || super.mouseReleased(event)
+
+    override fun mouseDragged(event: MouseButtonEvent, dx: Double, dy: Double): Boolean = popup != null || super.mouseDragged(event, dx, dy)
+
+    override fun mouseScrolled(x: Double, y: Double, sx: Double, sy: Double): Boolean {
+        val p = popup ?: return super.mouseScrolled(x, y, sx, sy)
+        p.mouseScrolled(sy)
+        return true
+    }
+
+    override fun keyPressed(event: KeyEvent): Boolean {
+        val p = popup
+        if (p != null) {
+            if (!p.keyPressed(event.key()) && popup === p) popup = null
+            return true
+        }
+        return bar?.keyPressed(event) == true || super.keyPressed(event)
+    }
+
+    override fun charTyped(event: CharacterEvent): Boolean {
+        val p = popup ?: return super.charTyped(event)
+        if (event.isAllowedChatCharacter) p.charTyped(event.codepointAsString())
+        return true
+    }
 
     override fun tick() {
         super.tick()
         refreshers.forEach { it() }
+        // タブを切り替えてボタンが消えたら閉じる
+        popup?.let { if (it.anchor !in children()) popup = null }
     }
 
     override fun removed() {
@@ -124,7 +178,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
     private fun cfg() = TranslatorConfig.current
 
     private fun toggle(label: Component, value: Boolean, width: Int = HALF, tooltip: Component? = null, onChange: (Boolean) -> Unit): CycleButton<Boolean> =
-        CycleButton.onOffBuilder(value)
+        CycleButton.booleanBuilder(T.onOff(true), T.onOff(false), value)
             .apply { if (tooltip != null) withTooltip { Tooltip.create(tooltip) } }
             .create(0, 0, width, 20, label) { _, v -> onChange(v) }
 
@@ -132,6 +186,38 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         CycleButton.builder(name, value)
             .withValues(values)
             .create(0, 0, width, 20, label) { _, v -> onChange(v) }
+
+    /** 押すと選択リストが開くボタン (「名前: 値 ▼」) */
+    private fun <T : Any> dropdown(
+        label: Component?,
+        values: () -> List<T>,
+        value: T?,
+        name: (T) -> Component,
+        width: Int = HALF,
+        menuName: (T) -> Component = name,
+        searchText: (T) -> String = { menuName(it).string },
+        onChange: (T) -> Unit,
+    ): Button {
+        var current = value
+        fun message(): Component {
+            val v = current?.let(name) ?: T.tr("dropdown.none")
+            return (if (label == null) v.copy() else CommonComponents.optionNameValue(label, v)).append(" ▼")
+        }
+        lateinit var btn: Button
+        btn = Button.builder(message()) {
+            val p = DropdownPopup(btn, values(), current, menuName, searchText) { v ->
+                current = v
+                btn.message = message()
+                onChange(v)
+            }
+            p.layout(width(), height())
+            popup = p
+        }.width(width).build()
+        return btn
+    }
+
+    private fun width() = width
+    private fun height() = height
 
     private fun button(label: Component, width: Int = HALF, onPress: () -> Unit): Button =
         Button.builder(label) { onPress() }.width(width).build()
@@ -176,8 +262,14 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
             val sources = listOf(Languages.AUTO) + Languages.ALL.map { it.code }
             val langName = { code: String -> Component.literal(Languages.displayName(code)) }
-            rows.addChild(cycle(T.tr("settings.source"), sources, c.sourceCode, langName) { TranslatorConfig.update(TranslatorConfig.sourceCode, it) })
-            rows.addChild(cycle(T.tr("settings.target"), Languages.ALL.map { it.code }, c.targetCode, langName) { TranslatorConfig.update(TranslatorConfig.targetCode, it) })
+            val menuName = { code: String -> Component.literal(Languages.menuName(code)) }
+            val search = { code: String -> Languages.menuName(code) + " " + code }
+            rows.addChild(dropdown(T.tr("settings.source"), { sources }, c.sourceCode, langName, menuName = menuName, searchText = search) {
+                TranslatorConfig.update(TranslatorConfig.sourceCode, it)
+            })
+            rows.addChild(dropdown(T.tr("settings.target"), { Languages.ALL.map { it.code } }, c.targetCode, langName, menuName = menuName, searchText = search) {
+                TranslatorConfig.update(TranslatorConfig.targetCode, it)
+            })
             rows.addChild(toggle(T.tr("settings.chat"), c.chatEnabled) { TranslatorConfig.update(TranslatorConfig.chatEnabled, it) })
             rows.addChild(cycle(T.tr("settings.display"), ChatDisplayMode.entries, c.chatDisplayMode, { T.tr("settings.display.${it.name.lowercase()}") }) {
                 TranslatorConfig.update(TranslatorConfig.chatDisplayMode, it)
@@ -192,6 +284,11 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
             rows.addChild(toggle(T.tr("settings.show_original"), c.tooltipShowOriginal, tooltip = T.tr("settings.show_original.tooltip")) {
                 TranslatorConfig.update(TranslatorConfig.tooltipShowOriginal, it)
             })
+            val uiName = { code: String -> if (code == T.AUTO) T.tr("settings.uilang.auto") else Component.literal(T.UI_LANGUAGE_NAMES.getValue(code)) }
+            rows.full(dropdown(T.tr("settings.uilang"), { listOf(T.AUTO) + T.UI_LANGUAGES }, c.uiLanguage.takeIf { it in T.UI_LANGUAGES } ?: T.AUTO, uiName, FULL) {
+                TranslatorConfig.update(TranslatorConfig.uiLanguage, it)
+                reopen(0)
+            }.also { it.setTooltip(Tooltip.create(T.tr("settings.uilang.tooltip"))) })
             rows.full(note(T.tr("settings.general.note")))
         }
     }
@@ -202,7 +299,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         init {
             val c = cfg()
             val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
-            rows.full(cycle(T.tr("settings.engine"), ProviderType.entries, c.provider, { it.label }, FULL) {
+            rows.full(dropdown(T.tr("settings.engine"), { ProviderType.entries }, c.provider, { it.label }, FULL) {
                 TranslatorConfig.update(TranslatorConfig.provider, it)
                 reopen(1)
             })
@@ -326,7 +423,58 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         }
     }
 
+    private inner class BackupTab : GridLayoutTab(T.tr("settings.tab.backup")) {
+        private var sections by ::backupSections
+        private var selected: Path? = mod.backup.files().firstOrNull()
+
+        init {
+            val backup = mod.backup
+            val rows = layout.rowSpacing(4).columnSpacing(10).createRowHelper(2)
+            rows.full(StringWidget(FULL, 12, T.tr("settings.backup.include"), font))
+            rows.addChild(toggle(T.tr("settings.backup.language"), sections.language) { sections = sections.copy(language = it) })
+            rows.addChild(toggle(T.tr("settings.backup.dictionaries"), sections.dictionaries, tooltip = T.tr("settings.backup.dictionaries.tooltip")) {
+                sections = sections.copy(dictionaries = it)
+            })
+            rows.addChild(toggle(T.tr("settings.backup.cache"), sections.cache, tooltip = T.tr("settings.backup.cache.tooltip", "%,d".format(mod.cache.size()))) {
+                sections = sections.copy(cache = it)
+            })
+            rows.addChild(button(T.tr("settings.backup.export")) { export() })
+
+            val file = dropdown(T.tr("settings.backup.file"), { backup.files() }, selected, { Component.literal(Backup.displayName(it)) }, FULL) { selected = it }
+            refreshers += { file.active = backup.files().isNotEmpty() }
+            rows.full(file)
+            rows.addChild(button(T.tr("settings.backup.import")) { import() }.also { b -> refreshers += { b.active = selected != null } })
+            rows.addChild(button(T.tr("settings.backup.folder")) {
+                java.nio.file.Files.createDirectories(backup.dir)
+                Blaze3D.openPath(backup.dir)
+            })
+            rows.full(MultiLineTextWidget(backupResult ?: T.tr("settings.backup.where"), font).setMaxWidth(FULL))
+            rows.full(note(T.tr("settings.backup.note")))
+        }
+
+        private fun export() {
+            if (!sections.any) return
+            backupResult = runCatching { T.tr("settings.backup.exported", mod.backup.export(sections).fileName.toString()) }
+                .getOrElse { T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName).withStyle(ChatFormatting.RED) }
+            reopen(4)
+        }
+
+        private fun import() {
+            val path = selected ?: return
+            backupResult = runCatching {
+                val r = mod.backup.import(path, sections)
+                T.tr("settings.backup.imported", path.fileName.toString(), T.onOff(r.language), r.dictionaries, "%,d".format(r.cacheEntries))
+            }.getOrElse { T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName).withStyle(ChatFormatting.RED) }
+            // 表示言語が変わることがあるので開き直す
+            reopen(4)
+        }
+    }
+
     companion object {
+        const val TAB_COUNT = 5
+        /** 開き直しても残すバックアップタブの状態 (含める項目と最後の結果) */
+        private var backupSections = Backup.Sections()
+        private var backupResult: Component? = null
         const val FULL = 310
         const val HALF = 150
 
@@ -374,7 +522,7 @@ class UserDictionaryScreen(private val parent: Screen) : Screen(T.tr("dictedit.t
         inputs.addChild(Button.builder(T.tr("dictedit.add")) { add() }.width(50).build())
 
         list = layout.addToContents(EntryList())
-        layout.addToFooter(Button.builder(CommonComponents.GUI_DONE) { onClose() }.width(200).build())
+        layout.addToFooter(Button.builder(T.tr("done")) { onClose() }.width(200).build())
         layout.visitWidgets { addRenderableWidget(it) }
         reloadEntries()
         repositionElements()

@@ -37,6 +37,16 @@ class TranslationCache(private val file: Path) {
 
     @Synchronized fun size() = map.size
 
+    /** エクスポート用の複製 (古い順) */
+    @Synchronized fun snapshot(): Map<String, String> = LinkedHashMap(map)
+
+    /** インポート。最大件数を超えた分は古いものから捨てる */
+    @Synchronized fun putAll(entries: Map<String, String>) {
+        map.putAll(entries)
+        trim()
+        dirty = true
+    }
+
     /** 保存しているファイルの大きさ (バイト) */
     fun fileSize(): Long = runCatching { Files.size(file) }.getOrDefault(0L)
 
