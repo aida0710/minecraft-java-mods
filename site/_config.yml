@@ -1,0 +1,24 @@
+# Minecraft Java Mods の紹介サイト (GitHub Pages)。
+# mod を足すときは _mods/<id>.md を 1 つ足す (書き方は site/README.md)。トップの一覧には自動で並ぶ
+title: Minecraft Java Mods
+url: https://aida0710.github.io
+baseurl: /minecraft-java-mods
+repository: aida0710/minecraft-java-mods
+
+collections:
+  mods:
+    output: true
+    permalink: /:name/
+
+defaults:
+  - scope:
+      type: mods
+    values:
+      layout: mod
+
+markdown: kramdown
+kramdown:
+  input: GFM
+
+exclude:
+  - README.md
