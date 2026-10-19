@@ -26,12 +26,12 @@ class ChatHandler(private val translator: Translator) {
     }
     private var nextId = 0
 
-    /** accesstransformer.cfg が適用されていなければ (他 mod との競合など) 追加表示にフォールバックする */
+    /** アクセスの書き換え (Forge / NeoForge の accesstransformer.cfg、Fabric の classtweaker) が効いていなければ (他 mod との競合など) 追加表示にフォールバックする */
     val canReplace: Boolean = runCatching {
         val cls = net.minecraft.client.gui.components.ChatComponent::class.java
         java.lang.reflect.Modifier.isPublic(cls.getDeclaredField("allMessages").modifiers) &&
             java.lang.reflect.Modifier.isPublic(cls.getDeclaredMethod("refreshTrimmedMessages").modifiers)
-    }.getOrDefault(false).also { if (!it) ChatTranslator.LOGGER.warn("Access transformer not applied; chat REPLACE mode falls back to APPEND") }
+    }.getOrDefault(false).also { if (!it) ChatTranslator.LOGGER.warn("ChatComponent access not widened; chat REPLACE mode falls back to APPEND") }
 
     /**
      * @return 表示するメッセージを差し替える場合はその Component、差し替えない場合は null
@@ -156,7 +156,7 @@ class ChatHandler(private val translator: Translator) {
         Component.literal(" ⤷ ").withStyle(ChatFormatting.DARK_GRAY)
             .append(Component.literal(translated).withStyle(ChatFormatting.GRAY))
 
-    /** addClientSystemMessage は Forge のチャットイベントを発火しないので自分の出力を再翻訳しない */
+    /** addClientSystemMessage はどのローダーでも受信チャットのイベントを発火しないので、自分の出力を再翻訳しない */
     private fun addLine(component: Component) = Minecraft.getInstance().gui.hud.chat.addClientSystemMessage(component)
 
     private fun onRenderThread(block: () -> Unit) {

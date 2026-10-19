@@ -1,0 +1,37 @@
+// 全ローダー共通のコード。バニラの Minecraft (NeoForm) に対してコンパイルするので、
+// ローダー固有の API を使うとここでコンパイルエラーになる。単体テストもここで実行する
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm'
+    id 'net.neoforged.moddev'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+kotlin.jvmToolchain(25)
+
+neoForge {
+    neoFormVersion = neo_form_version
+    accessTransformers.from(file('src/main/resources/META-INF/accesstransformer.cfg'))
+    // テストでも Minecraft のクラス (Component や Gson) を使う
+    addModdingDependenciesTo(sourceSets.test)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+    implementation "com.electronwill.night-config:toml:${night_config_version}"
+
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:${kotlin_version}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}

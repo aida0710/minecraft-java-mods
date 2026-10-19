@@ -30,8 +30,6 @@ import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
-import net.minecraftforge.client.ConfigScreenHandler
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
 import java.nio.file.Path
 
 /** 内蔵 LLM で選べるモデル */
@@ -479,12 +477,6 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         const val HALF = 150
 
         /** mod 一覧の「設定」ボタンから開けるようにする */
-        fun registerConfigButton(context: FMLJavaModLoadingContext) {
-            context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory::class.java) {
-                ConfigScreenHandler.ConfigScreenFactory { _: Minecraft, parent: Screen -> SettingsScreen(parent) }
-            }
-        }
-
         fun open(parent: Screen? = Minecraft.getInstance().gui.screen(), tab: Int = 0) {
             Minecraft.getInstance().gui.setScreen(SettingsScreen(parent, tab))
         }

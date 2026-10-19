@@ -101,14 +101,14 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "install" -> ChatTranslator.instance.llama.installAsync(TranslatorConfig.current, startAfter = true)
             // Minecraft の表示言語を切り替える (mod の画面の多言語表示を確認する用)
             "uilang" -> { mc.languageManager.setSelected(args[1]); mc.options.languageCode = args[1]; mc.reloadResourcePacks() }
-            // インベントリを開いた状態でショートカットキーを押したときと同じイベントを送る (K = チャット翻訳 ON/OFF に割り当て)
+            // インベントリを開いた状態でショートカットキーを押したときの処理を呼ぶ (K = チャット翻訳 ON/OFF に割り当て)
             "screenkey" -> {
                 val keys = ChatTranslator.instance.keys
                 keys.toggleChat.setKey(InputConstants.Type.KEYBOARD.getOrCreate(InputConstants.KEY_K))
                 KeyMapping.resetMapping()
                 val inv = net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player!!)
                 mc.gui.setScreen(inv)
-                net.minecraftforge.client.event.ScreenEvent.KeyPressed.Pre.BUS.post(net.minecraftforge.client.event.ScreenEvent.KeyPressed.Pre(inv, net.minecraft.client.input.KeyEvent(InputConstants.KEY_K, 0, 0)))
+                keys.onScreenKey(inv, net.minecraft.client.input.KeyEvent(InputConstants.KEY_K, 0, 0))
                 log("after K in inventory: chatEnabled=${TranslatorConfig.current.chatEnabled}")
             }
             "status" -> log("engine=${ChatTranslator.instance.engineStatus()} ready=${ChatTranslator.instance.translator.isReady()}")

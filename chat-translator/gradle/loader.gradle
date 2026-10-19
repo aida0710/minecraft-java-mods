@@ -1,0 +1,63 @@
+// forge / neoforge / fabric で共通のビルド設定。各ローダーの build.gradle が
+// plugins { java, kotlin, shadow, ローダーのプラグイン } を宣言したあとに apply from で読み込む。
+//  - common のソースとリソースを取り込んで、1 つの mod jar にする
+//  - Kotlin 標準ライブラリと NightConfig はリロケートして jar に同梱する (Kotlin for Forge などは不要)
+//  - 配布用の jar は chattranslator-<ローダー>-<版>.jar
+
+version = mod_version
+group = 'com.aida0710.chattranslator'
+base.archivesName = "chattranslator-${project.name}"
+
+// Mojang ships Java 25 to end users in 26.1+, so the mod targets Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+kotlin.jvmToolchain(25)
+
+def commonDir = rootProject.file('common/src/main')
+sourceSets.main.kotlin.srcDir(new File(commonDir, 'kotlin'))
+sourceSets.main.resources.srcDir(new File(commonDir, 'resources'))
+
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+dependencies {
+    shade "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+    shade "com.electronwill.night-config:toml:${night_config_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 各ローダーの mod 情報ファイル (mods.toml / neoforge.mods.toml / fabric.mod.json) に版を埋め込む
+tasks.named('processResources', ProcessResources) {
+    def props = [
+        mod_version            : mod_version,
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        forge_version_range    : forge_version_range,
+        neoforge_version_range : neoforge_version_range,
+        fabric_loader_version  : fabric_loader_version,
+    ]
+    inputs.properties props
+    filesMatching(['META-INF/mods.toml', 'META-INF/neoforge.mods.toml', 'fabric.mod.json']) { expand props }
+}
+
+tasks.named('jar', Jar) {
+    archiveClassifier = 'slim'
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier = ''
+    configurations = [project.configurations.shade]
+    relocate 'kotlin', 'com.aida0710.chattranslator.shadow.kotlin'
+    relocate 'com.electronwill.nightconfig', 'com.aida0710.chattranslator.shadow.nightconfig'
+    // 同梱するとローダーのモジュールシステムと衝突するため除外
+    exclude 'module-info.class', 'META-INF/versions/*/module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
+    // kotlin-stdlib が依存する注釈ライブラリは Minecraft 側にもあり、同梱すると衝突しうる
+    exclude 'org/intellij/**', 'org/jetbrains/annotations/**'
+    manifest.attributes('Implementation-Version': mod_version)
+}
+
+tasks.named('assemble') { dependsOn 'shadowJar' }

@@ -7,14 +7,11 @@ import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.resources.Identifier
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent
-import net.minecraftforge.client.event.ScreenEvent
-import java.util.function.Consumer
 
 /**
  * キー割り当て (設定 > 操作 > Chat Translator で変更可)。
  * バニラはインベントリなどの画面を開いている間 KeyMapping を処理しないため、
- * 画面中のキー入力は ScreenEvent で拾い、どこでも効くようにしている。
+ * 画面中のキー入力は各ローダーの画面のキー入力イベントから [onScreenKey] に渡し、どこでも効くようにしている。
  */
 class Keybinds(private val mod: ChatTranslator) {
     private val category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ChatTranslator.MODID, "main"))
@@ -27,20 +24,20 @@ class Keybinds(private val mod: ChatTranslator) {
     val toggleTooltip = KeyMapping("key.chattranslator.toggle_tooltip", InputConstants.UNKNOWN.value, category)
     val openSettings = KeyMapping("key.chattranslator.open_settings", InputConstants.UNKNOWN.value, category)
 
-    private val all get() = listOf(holdOriginal, toggleOriginal, toggleChat, toggleTooltip, openSettings)
+    /** 各ローダーの登録処理に渡す */
+    val mappings get() = listOf(holdOriginal, toggleOriginal, toggleChat, toggleTooltip, openSettings)
 
     /** toggleOriginal で切り替える原文表示の状態 (保存しない) */
     @Volatile var originalToggled = false
         private set
-
-    fun register(event: RegisterKeyMappingsEvent) = all.forEach { event.register(it) }
 
     /** ツールチップを原文で表示するか */
     fun showOriginal(): Boolean = originalToggled || isHeld(holdOriginal)
 
     /** インベントリ画面中は KeyMapping の状態が更新されないため、キーボードの生の状態を見る */
     private fun isHeld(key: KeyMapping): Boolean {
-        val k = key.key
+        // 割り当て中のキーを返す getter はバニラに無い (Forge だけが足している) ため、保存用の名前から引く
+        val k = InputConstants.getKey(key.saveString())
         return k.type == InputConstants.Type.KEYBOARD && k.value > 0 && InputConstants.isKeyDown(k.value)
     }
 
@@ -52,12 +49,8 @@ class Keybinds(private val mod: ChatTranslator) {
         while (openSettings.consumeClick()) SettingsScreen.open()
     }
 
-    /** 画面を開いているとき (インベントリ・チェストなど) */
-    fun registerScreenListener() {
-        ScreenEvent.KeyPressed.Pre.BUS.addListener(Consumer { ev -> onScreenKey(ev.screen, ev.info) })
-    }
-
-    private fun onScreenKey(screen: net.minecraft.client.gui.screens.Screen, event: KeyEvent) {
+    /** 画面を開いているとき (インベントリ・チェストなど) のキー入力 */
+    fun onScreenKey(screen: net.minecraft.client.gui.screens.Screen, event: KeyEvent) {
         if (!mod.ready()) return
         // 文字入力中 (チャット欄・検索欄など) はショートカットとして扱わない
         if (screen is ChatScreen || screen.focused is EditBox || screen is SettingsScreen) return

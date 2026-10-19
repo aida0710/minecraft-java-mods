@@ -3,27 +3,20 @@ package com.aida0710.chattranslator
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
-import net.minecraftforge.client.event.ClientChatReceivedEvent
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent
-import net.minecraftforge.client.event.RegisterClientCommandsEvent
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent
-import net.minecraftforge.client.event.SystemMessageReceivedEvent
-import net.minecraftforge.event.TickEvent
-import net.minecraftforge.event.entity.player.ItemTooltipEvent
-import net.minecraftforge.fml.common.Mod
-import net.minecraftforge.fml.config.ModConfig
-import net.minecraftforge.fml.event.config.ModConfigEvent
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
-import net.minecraftforge.fml.loading.FMLPaths
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.function.Consumer
 
-@Mod(ChatTranslator.MODID)
-class ChatTranslator(context: FMLJavaModLoadingContext) {
+/**
+ * mod の本体。ローダー (Forge / NeoForge / Fabric) ごとの入口がこれを作り、
+ * 各ローダーのイベントから on〜 の関数を呼ぶ。
+ *
+ * @param configDir .minecraft/config
+ */
+class ChatTranslator(configDir: Path) {
     companion object {
         const val MODID = "chattranslator"
         @JvmField val LOGGER: Logger = LoggerFactory.getLogger("ChatTranslator")
@@ -35,7 +28,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
             private set
     }
 
-    val dataDir = FMLPaths.CONFIGDIR.get().resolve(MODID)!!
+    val dataDir: Path = configDir.resolve(MODID)
     val itemNames = ItemNames(dataDir.resolve("skyblock_items.json"))
     val dictionaries = Dictionaries(dataDir.resolve("dictionaries"), itemNames)
     val cache = TranslationCache(dataDir.resolve("cache.json"))
@@ -57,39 +50,13 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
 
     init {
         instance = this
-        context.registerConfig(ModConfig.Type.CLIENT, TranslatorConfig.SPEC)
-        val modBus = context.modBusGroup
-        ModConfigEvent.Loading.getBus(modBus).addListener { if (it.config.modId == MODID) onConfigLoaded() }
-        ModConfigEvent.Reloading.getBus(modBus).addListener { if (it.config.modId == MODID) TranslatorConfig.reload() }
-        SettingsScreen.registerConfigButton(context)
-
-        RegisterKeyMappingsEvent.BUS.addListener { keys.register(it) }
-        RegisterClientCommandsEvent.BUS.addListener { Commands.register(it.dispatcher, this) }
-        keys.registerScreenListener()
-
-        // Hypixel はプレイヤー発言も含めほぼ全てシステムメッセージとして送ってくる。
-        // 元メッセージはキャンセルせず、必要なら差し替えるだけ
-        SystemMessageReceivedEvent.BUS.addListener(Consumer { ev ->
-            if (ready()) chat.onMessage(ev.message, isSystem = true)?.let { ev.message = it }
-        })
-        ClientChatReceivedEvent.Player.BUS.addListener(Consumer { ev ->
-            if (ready()) chat.onMessage(ev.message, isSystem = false)?.let { ev.message = it }
-        })
-        ClientChatReceivedEvent.BUS.addListener(Consumer { ev ->
-            // 継承イベントとして Player が届いた場合は上のリスナーで処理済み
-            if (ev !is ClientChatReceivedEvent.Player && ready()) chat.onMessage(ev.message, isSystem = false)?.let { ev.message = it }
-        })
-        ClientPlayerNetworkEvent.LoggingIn.BUS.addListener(Consumer { onLoggedIn() })
-        ClientPlayerNetworkEvent.LoggingOut.BUS.addListener(Consumer { onLoggedOut() })
-        ItemTooltipEvent.BUS.addListener(Consumer { if (ready()) tooltip.onTooltip(it.toolTip) })
-        TickEvent.ClientTickEvent.Post.BUS.addListener(Consumer { onClientTick() })
+        TranslatorConfig.load(configDir.resolve("$MODID-client.toml"))
+        start()
     }
 
     fun ready() = ::translator.isInitialized
 
-    private fun onConfigLoaded() {
-        TranslatorConfig.reload()
-        if (ready()) return
+    private fun start() {
         val cfg = TranslatorConfig.current
         cache.maxEntries = cfg.maxCacheEntries
         cache.persist = cfg.cachePersist
@@ -146,8 +113,23 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         lastProvider = cfg.provider
     }
 
+    // ---- 各ローダーのイベントから呼ぶ ----
+
+    /**
+     * 受信したチャット・システムメッセージ。元メッセージはキャンセルせず、必要なら差し替えるだけ
+     * (Hypixel はプレイヤー発言も含めほぼ全てシステムメッセージとして送ってくる)。
+     * @return 表示するメッセージを差し替える場合はその Component
+     */
+    fun onChatReceived(message: Component, isSystem: Boolean): Component? =
+        if (ready()) chat.onMessage(message, isSystem) else null
+
+    /** アイテムのツールチップ。lines を書き換える */
+    fun onTooltip(lines: MutableList<Component>) {
+        if (ready()) tooltip.onTooltip(lines)
+    }
+
     /** ワールド/サーバーに入ったときに翻訳エンジンを起動する (ゲーム起動時は何もしないので軽い) */
-    private fun onLoggedIn() {
+    fun onLoggedIn() {
         if (!ready()) return
         val cfg = TranslatorConfig.current
         lastProvider = cfg.provider
@@ -163,7 +145,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         }
     }
 
-    private fun onLoggedOut() {
+    fun onLoggedOut() {
         // 遊んでいない間は VRAM を使わない
         if (ready()) llama.stop()
     }
@@ -188,7 +170,7 @@ class ChatTranslator(context: FMLJavaModLoadingContext) {
         }
     }
 
-    private fun onClientTick() {
+    fun onClientTick() {
         if (!ready()) return
         flushNotices()
         selfTest?.onTick()

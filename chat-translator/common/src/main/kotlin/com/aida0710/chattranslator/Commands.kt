@@ -1,47 +1,55 @@
 package com.aida0710.chattranslator
 
 import com.mojang.brigadier.CommandDispatcher
+import com.mojang.brigadier.arguments.ArgumentType
 import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.builder.LiteralArgumentBuilder
+import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.SuggestionProvider
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import net.minecraft.commands.CommandSourceStack
-import net.minecraft.commands.Commands.argument
-import net.minecraft.commands.Commands.literal
 import net.minecraft.commands.SharedSuggestionProvider
 import net.minecraft.network.chat.Component
 
-/** クライアントコマンド /chattranslator (サーバーのコマンドと衝突しないよう短縮形は作らない) */
-object Commands {
-    private fun reply(src: CommandSourceStack, text: Component, color: ChatFormatting = ChatFormatting.AQUA) =
-        src.sendSystemMessage(Component.literal("[ChatTranslator] ").withStyle(ChatFormatting.AQUA).append(text.copy().withStyle(color)))
+/**
+ * クライアントコマンド /chattranslator (サーバーのコマンドと衝突しないよう短縮形は作らない)。
+ * コマンドの送り主の型はローダーごとに違う (Forge / NeoForge は CommandSourceStack、Fabric は FabricClientCommandSource) ため、
+ * 型 [S] と、送り主へ返信する関数 [sendMessage] を受け取る。
+ */
+class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
+    private fun reply(src: S, text: Component, color: ChatFormatting = ChatFormatting.AQUA) =
+        sendMessage(src, Component.literal("[ChatTranslator] ").withStyle(ChatFormatting.AQUA).append(text.copy().withStyle(color)))
 
-    private val languages = SuggestionProvider<CommandSourceStack> { _, builder ->
+    private fun literal(name: String): LiteralArgumentBuilder<S> = LiteralArgumentBuilder.literal(name)
+
+    private fun <T> argument(name: String, type: ArgumentType<T>): RequiredArgumentBuilder<S, T> = RequiredArgumentBuilder.argument(name, type)
+
+    private val languages = SuggestionProvider<S> { _, builder ->
         SharedSuggestionProvider.suggest(Languages.ALL.map { it.code } + Languages.AUTO, builder)
     }
 
-    private fun dictionaryIds(mod: ChatTranslator) = SuggestionProvider<CommandSourceStack> { _, builder ->
+    private fun dictionaryIds(mod: ChatTranslator) = SuggestionProvider<S> { _, builder ->
         SharedSuggestionProvider.suggest(mod.dictionaries.packs.map { it.id }, builder)
     }
 
-    private fun keepTerms(mod: ChatTranslator) = SuggestionProvider<CommandSourceStack> { _, builder ->
+    private fun keepTerms(mod: ChatTranslator) = SuggestionProvider<S> { _, builder ->
         SharedSuggestionProvider.suggest(mod.dictionaries.userPack?.keep ?: emptyList(), builder)
     }
 
-    private fun exportFiles(mod: ChatTranslator) = SuggestionProvider<CommandSourceStack> { _, builder ->
+    private fun exportFiles(mod: ChatTranslator) = SuggestionProvider<S> { _, builder ->
         SharedSuggestionProvider.suggest(mod.backup.files().map { it.fileName.toString() }, builder)
     }
 
-    private fun export(src: CommandSourceStack, mod: ChatTranslator, name: String?) {
+    private fun export(src: S, mod: ChatTranslator, name: String?) {
         runCatching { mod.backup.export(Backup.Sections(), name) }
             .onSuccess { reply(src, T.tr("settings.backup.exported", it.fileName.toString())) }
             .onFailure { reply(src, T.tr("settings.backup.failed", it.message ?: it.javaClass.simpleName), ChatFormatting.RED) }
     }
 
-    fun register(dispatcher: CommandDispatcher<CommandSourceStack>, mod: ChatTranslator) {
-        fun ok(block: (CommandContext<CommandSourceStack>) -> Unit): com.mojang.brigadier.Command<CommandSourceStack> =
+    fun register(dispatcher: CommandDispatcher<S>, mod: ChatTranslator) {
+        fun ok(block: (CommandContext<S>) -> Unit): com.mojang.brigadier.Command<S> =
             com.mojang.brigadier.Command { ctx -> block(ctx); 1 }
 
         val root = literal("chattranslator")
