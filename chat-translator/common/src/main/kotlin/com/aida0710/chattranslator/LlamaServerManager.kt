@@ -23,6 +23,7 @@ enum class GpuBackend { VULKAN, CUDA, CUDA12, CPU }
  */
 class LlamaServerManager(
     private val baseDir: Path,
+    private val releases: LlamaReleases = LlamaReleases(),
     private val notify: (message: Component, progress: Boolean) -> Unit,
 ) {
     enum class State { NOT_INSTALLED, INSTALLING, STOPPED, STARTING, READY, FAILED }
@@ -80,10 +81,11 @@ class LlamaServerManager(
                 if (startAfter) startAsync(cfg)
             } catch (e: Exception) {
                 state = if (isInstalled(cfg)) State.STOPPED else State.NOT_INSTALLED
-                lastError = e.message ?: e.toString()
-                progressText = T.tr("llama.failed", lastError ?: "")
+                val reason = installFailureText(e)
+                lastError = reason
+                progressText = T.tr("llama.failed", reason)
                 ChatTranslator.LOGGER.error("Failed to install built-in LLM", e)
-                notify(T.tr("llama.install_failed", e.message ?: e.toString()), false)
+                notify(T.tr("llama.install_failed", reason), false)
             } finally {
                 installing.set(false)
             }
@@ -247,41 +249,28 @@ class LlamaServerManager(
         res.statusCode() == 200
     }.getOrDefault(false)
 
-    private fun ensureBinary(cfg: TranslatorConfig.Values): Path {
+    internal fun ensureBinary(cfg: TranslatorConfig.Values): Path {
         val dir = binDir(cfg)
         findServer(dir)?.let { return it }
 
-        val assets = assetNames(cfg.llamaBuild, cfg.gpuBackend)
-        val digests = releaseDigests(cfg.llamaBuild)
+        val assets = LlamaReleases.assetNames(cfg.llamaBuild, cfg.gpuBackend)
+        val sha256ByAssetName = releases.sha256ByAssetName(cfg.llamaBuild)
         for (asset in assets) {
             val archive = baseDir.resolve("downloads").resolve(asset)
-            val url = "https://github.com/ggml-org/llama.cpp/releases/download/${cfg.llamaBuild}/$asset"
-            // 実行ファイルなので、GitHub が公開している SHA-256 と一致しない限り使わない
-            val sha256 = digests[asset] ?: throw IllegalStateException("$asset の SHA-256 を GitHub から取得できないため中止しました")
+            // 実行ファイルなので、SHA-256 が一致しない限り使わない
+            val sha256 = sha256ByAssetName[asset] ?: throw IllegalStateException("$asset の SHA-256 を GitHub から取得できないため中止しました")
             notify(T.tr("llama.downloading", "llama.cpp ($asset)"), false)
-            Downloader.download(url, archive, sha256) { done, total -> progress(asset, done, total) }
+            Downloader.download(releases.downloadUrl(cfg.llamaBuild, asset), archive, sha256) { done, total -> progress(asset, done, total) }
             Downloader.extract(archive, dir)
             Files.deleteIfExists(archive)
         }
         return findServer(dir) ?: throw IllegalStateException("llama-server not found in ${assets.first()}")
     }
 
-    /** GitHub Releases API からアセット名 → SHA-256 を取得する */
-    private fun releaseDigests(build: String): Map<String, String> {
-        val res = http.send(
-            HttpRequest.newBuilder(URI.create("https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/$build"))
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "ChatTranslator-Minecraft-Mod")
-                .timeout(Duration.ofSeconds(20)).GET().build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-        check(res.statusCode() == 200) { "GitHub API HTTP ${res.statusCode()}" }
-        return com.google.gson.JsonParser.parseString(res.body()).asJsonObject.getAsJsonArray("assets").mapNotNull { a ->
-            val o = a.asJsonObject
-            val digest = o["digest"]?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
-            if (!digest.startsWith("sha256:")) return@mapNotNull null
-            o["name"].asString to digest.removePrefix("sha256:")
-        }.toMap()
+    /** インストールが失敗した理由を、設定画面とチャットに出す文にする */
+    private fun installFailureText(e: Exception): String = when (e) {
+        is GitHubRateLimitedException -> T.s("llama.github_rate_limited", e.waitMinutes, LlamaReleases.DEFAULT_BUILD)
+        else -> e.message ?: e.toString()
     }
 
     private fun findServer(dir: Path): Path? {
@@ -319,32 +308,7 @@ class LlamaServerManager(
 
     companion object {
         private const val MAX_RESTARTS = 3
-        private val os = System.getProperty("os.name").lowercase(Locale.ROOT)
-        private val arm = System.getProperty("os.arch").lowercase(Locale.ROOT).let { it.contains("aarch64") || it.contains("arm") }
-        val isWindows = os.contains("win")
-        val isMac = os.contains("mac")
-
-        /** 実行環境に合う llama.cpp リリースのアセット名 (CUDA は cudart も必要) */
-        fun assetNames(build: String, gpu: GpuBackend): List<String> = when {
-            isWindows -> {
-                val a = if (arm) "arm64" else "x64"
-                when (gpu) {
-                    GpuBackend.VULKAN -> listOf("llama-$build-bin-win-vulkan-$a.zip")
-                    GpuBackend.CPU -> listOf("llama-$build-bin-win-cpu-$a.zip")
-                    GpuBackend.CUDA -> listOf("llama-$build-bin-win-cuda-13.4-$a.zip", "cudart-llama-bin-win-cuda-13.4-$a.zip")
-                    GpuBackend.CUDA12 -> listOf("llama-$build-bin-win-cuda-12.4-x64.zip", "cudart-llama-bin-win-cuda-12.4-x64.zip")
-                }
-            }
-            isMac -> listOf("llama-$build-bin-macos-${if (arm) "arm64" else "x64"}.tar.gz") // Metal 対応済み
-            else -> {
-                val a = if (arm) "arm64" else "x64"
-                when (gpu) {
-                    GpuBackend.VULKAN -> listOf("llama-$build-bin-ubuntu-vulkan-$a.tar.gz")
-                    GpuBackend.CPU -> listOf("llama-$build-bin-ubuntu-$a.tar.gz")
-                    GpuBackend.CUDA -> listOf("llama-$build-bin-ubuntu-cuda-13.4-$a.tar.gz", "cudart-llama-$build-bin-ubuntu-cuda-13.4-$a.tar.gz")
-                    GpuBackend.CUDA12 -> listOf("llama-$build-bin-ubuntu-cuda-12.8-x64.tar.gz", "cudart-llama-$build-bin-ubuntu-cuda-12.8-x64.tar.gz")
-                }
-            }
-        }
+        val isWindows = HostPlatform.current.os == HostPlatform.Os.WINDOWS
+        val isMac = HostPlatform.current.os == HostPlatform.Os.MAC
     }
 }

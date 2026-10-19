@@ -1,10 +1,8 @@
 package com.aida0710.chattranslator
 
 import com.sun.net.httpserver.HttpServer
-import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
 import java.nio.file.Files
-import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.readText
@@ -63,28 +61,12 @@ class DownloaderTest {
     fun extractsZipAndTarGz() {
         val dir = Files.createTempDirectory("ex")
         val zip = dir.resolve("a.zip")
-        ZipOutputStream(Files.newOutputStream(zip)).use { z ->
-            z.putNextEntry(ZipEntry("bin/llama-server.exe")); z.write("zip".toByteArray()); z.closeEntry()
-        }
+        Files.write(zip, TestArchives.zip(mapOf("bin/llama-server.exe" to "zip".toByteArray())))
         Downloader.extract(zip, dir.resolve("z"))
         assertEquals("zip", dir.resolve("z/bin/llama-server.exe").readText())
 
-        // ustar ヘッダを手書きして tar.gz を作る
-        fun header(name: String, size: Int): ByteArray {
-            val h = ByteArray(512)
-            name.toByteArray().copyInto(h, 0)
-            "0000755\u0000".toByteArray().copyInto(h, 100)
-            "%011o\u0000".format(size).toByteArray().copyInto(h, 124)
-            h[156] = '0'.code.toByte()
-            "ustar\u0000".toByteArray().copyInto(h, 257)
-            return h
-        }
-        val content = "tar".toByteArray()
-        val tar = ByteArrayOutputStream().apply {
-            write(header("build/bin/llama-server", content.size)); write(content); write(ByteArray(512 - content.size)); write(ByteArray(1024))
-        }.toByteArray()
         val tgz = dir.resolve("a.tar.gz")
-        GZIPOutputStream(Files.newOutputStream(tgz)).use { it.write(tar) }
+        Files.write(tgz, TestArchives.tarGz(mapOf("build/bin/llama-server" to "tar".toByteArray())))
         Downloader.extract(tgz, dir.resolve("t"))
         assertEquals("tar", dir.resolve("t/build/bin/llama-server").readText())
     }

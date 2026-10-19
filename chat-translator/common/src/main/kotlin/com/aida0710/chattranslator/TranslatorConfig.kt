@@ -140,7 +140,10 @@ object TranslatorConfig {
     )
     val modelUrl = StringSetting("builtin.modelUrl", DEFAULT_MODEL_URL, "GGUF モデルのダウンロード URL")
     val modelSha256 = StringSetting("builtin.modelSha256", DEFAULT_MODEL_SHA256, "モデルの SHA-256 (空なら検証しない)")
-    val llamaBuild = StringSetting("builtin.llamaBuild", "b11719", "llama.cpp のリリースタグ")
+    val llamaBuild = StringSetting(
+        "builtin.llamaBuild", LlamaReleases.DEFAULT_BUILD,
+        "llama.cpp のリリースタグ (既定以外にすると、照合用の SHA-256 を GitHub API から取る。未認証のため同じ IP から 1 時間 60 回まで)",
+    )
     val gpuLayers = IntSetting("builtin.gpuLayers", 99, 0..999, "GPU に載せる層数 (99 = 全部)")
     val contextSize = IntSetting("builtin.contextSize", 4096, 512..131072)
     val port = IntSetting("builtin.port", 0, 0..65535, "待ち受けポート (0 = 自動)")

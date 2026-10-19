@@ -55,6 +55,7 @@
   "chattranslator.download.progress": "%s: %s%% (%s / %s MB)",
   "chattranslator.llama.install_done": "The built-in LLM has been installed",
   "chattranslator.llama.install_failed": "Failed to install the built-in LLM: %s",
+  "chattranslator.llama.github_rate_limited": "Reached the GitHub API limit (60 requests per hour from one IP address), so the llama.cpp checksums could not be fetched. Try again in about %s min, or set builtin.llamaBuild back to the default %s to install without waiting",
   "chattranslator.llama.failed": "Failed: %s",
   "chattranslator.llama.downloading": "Downloading %s…",
   "chattranslator.llama.starting": "Starting the built-in LLM…",

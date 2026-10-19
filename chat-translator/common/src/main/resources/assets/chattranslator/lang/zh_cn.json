@@ -55,6 +55,7 @@
   "chattranslator.download.progress": "%s：%s%%（%s / %s MB）",
   "chattranslator.llama.install_done": "内置 LLM 安装完成",
   "chattranslator.llama.install_failed": "内置 LLM 安装失败：%s",
+  "chattranslator.llama.github_rate_limited": "已达到 GitHub API 的调用次数上限（同一 IP 每小时 60 次），无法获取 llama.cpp 的校验值。请在约 %s 分钟后重试，或将 builtin.llamaBuild 改回默认的 %s，即可无需等待直接安装",
   "chattranslator.llama.failed": "失败：%s",
   "chattranslator.llama.downloading": "正在下载 %s…",
   "chattranslator.llama.starting": "正在启动内置 LLM…",
