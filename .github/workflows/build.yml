@@ -28,6 +28,15 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      # タグの版と gradle.properties の mod_version が違うと、別の版の jar を配ってしまうので先に止める
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/chat-translator-v')
+        run: |
+          VERSION=${GITHUB_REF_NAME#chat-translator-v}
+          grep -qx "mod_version=$VERSION" gradle.properties || { echo "tag $GITHUB_REF_NAME does not match mod_version in gradle.properties"; exit 1; }
+          test -f release-notes/$VERSION.md || { echo "missing release-notes/$VERSION.md"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
       - name: Build
         run: ./gradlew build --stacktrace
 
@@ -42,10 +51,11 @@ jobs:
               fabric) METADATA="fabric.mod.json chattranslator.classtweaker" ;;
             esac
             LIST=$(unzip -l "$JAR")
-            for f in com/aida0710/chattranslator/ChatTranslator.class com/aida0710/chattranslator/shadow/kotlin/Unit.class com/aida0710/chattranslator/shadow/nightconfig/toml/TomlFormat.class $METADATA assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
+            for f in com/aida0710/chattranslator/ChatTranslator.class com/aida0710/chattranslator/shadow/kotlin/Unit.class com/aida0710/chattranslator/shadow/nightconfig/toml/TomlFormat.class $METADATA assets/chattranslator/icon.png META-INF/LICENSE META-INF/licenses/THIRD-PARTY.txt META-INF/licenses/LGPL-3.0.txt META-INF/licenses/GPL-3.0.txt assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
               grep -q " $f\$" <<<"$LIST" || { echo "missing $f in $JAR"; exit 1; }
             done
             if grep -E ' (kotlin|org/intellij|org/jetbrains|com/electronwill)/' <<<"$LIST"; then echo "unrelocated or unwanted classes found in $JAR"; exit 1; fi
+            if unzip -p "$JAR" META-INF/licenses/THIRD-PARTY.txt | grep -F '${'; then echo "library versions are not filled in THIRD-PARTY.txt of $JAR"; exit 1; fi
           done
           unzip -p fabric/build/libs/chattranslator-fabric-*[0-9].jar fabric.mod.json | python3 -m json.tool > /dev/null
 
@@ -60,4 +70,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/chat-translator-v')
         uses: softprops/action-gh-release@v3
         with:
+          name: Chat Translator ${{ env.VERSION }}
+          body_path: chat-translator/release-notes/${{ env.VERSION }}.md
           files: chat-translator/*/build/libs/chattranslator-*[0-9].jar

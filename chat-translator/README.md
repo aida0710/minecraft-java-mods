@@ -1,3 +1,5 @@
+<img src="docs/icon.svg" alt="Chat Translator のアイコン" width="96">
+
 # Chat Translator (Minecraft 26.3 / Forge・NeoForge・Fabric / Kotlin)
 
 受信チャット・**アイテムのツールチップ (名前・説明文)**・**本**を翻訳し、**自分が送るチャットも翻訳して送れる**クライアント専用 mod です。Hypixel SkyBlock での利用を想定していますが、どのサーバーでも使えます。
@@ -147,6 +149,15 @@
 - 4B モデルはゲーム内スラング (`f7` = フロア 7、`900m` = 9 億コイン など) を誤訳しがちです
 - 送信するチャットの翻訳を ON にした場合を除き、この mod はクライアント側の表示を変えるだけで、サーバーへ何かを送信することはありません。送信の翻訳も、自分が Enter を押した発言の中身を訳文に変えるだけです。Hypixel のルール (Allowed Modifications) に照らしての利用可否はご自身で判断してください
 
+## ライセンス
+
+[Apache License 2.0](../LICENSE)。jar には次のライブラリを同梱しています (詳しくは [licenses/THIRD-PARTY.txt](licenses/THIRD-PARTY.txt)。jar の中では `META-INF/licenses/`)。
+
+- Kotlin 標準ライブラリ: Apache License 2.0
+- NightConfig (設定ファイルの読み書き): GNU LGPL v3.0 ([licenses/LGPL-3.0.txt](licenses/LGPL-3.0.txt)。LGPL は [GPL v3.0](licenses/GPL-3.0.txt) に条件を足したもの)
+
+内蔵 LLM の llama.cpp (MIT License) と TranslateGemma (Gemma の利用規約) は jar に入っておらず、設定画面で「インストール」を押したときにダウンロードします。
+
 ## 開発
 
 ```powershell
@@ -156,6 +167,12 @@ cd chat-translator
 ```
 
 配布用の jar は `forge/build/libs/chattranslator-forge-<version>.jar` (NeoForge・Fabric も同じ形) です。Kotlin 標準ライブラリと設定ファイル用の NightConfig を同梱しています。
+
+### 公開の手順
+
+1. `gradle.properties` の `mod_version` を上げ、`release-notes/<版>.md` に公開する版の説明を書く。紹介サイトの `site/_mods/chat-translator.md` の `version` も同じ版にする
+2. main に取り込んだら、そのコミットにタグ `chat-translator-v<版>` を付けて push する
+3. 自動ビルドが、タグと `mod_version` が同じか・説明があるかを確かめてから、3 つの jar を付けた Release を作る
 
 | フォルダ | 中身 |
 | --- | --- |
