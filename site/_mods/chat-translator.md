@@ -15,11 +15,47 @@ video_poster: /assets/chat-translator/poster.jpg
 summary:
   ja: チャット・アイテムの説明・本を翻訳し、自分の発言も翻訳して送れるクライアント用の mod です。
   en: A client-side mod that translates chat, item tooltips and books, and can send your own messages translated.
+# ページの冒頭のチャット欄に流す発言 (assets/js/chat-demo.js が使う)
 demo:
-  prefix: "[MVP+] Steve: "
-  prefix_color: "#55FFFF"
-  original: anyone want to do dungeons? we need a healer
-  translated: ダンジョンに行く人はいますか？ ヒーラーを探しています。
+  # ボタンと説明の表記。ゲーム内と同じ (chat-translator の lang ファイルの chattranslator.chat.*)
+  ui:
+    ja:
+      show_original: "[原文]"
+      show_original_tooltip: "クリックで原文を表示"
+      show_translation: "[訳]"
+      show_translation_tooltip: "クリックで訳文を表示"
+      original_prefix: "原文: "
+    en:
+      show_original: "[Original]"
+      show_original_tooltip: "Click to show the original text"
+      show_translation: "[Translated]"
+      show_translation_tooltip: "Click to show the translation"
+      original_prefix: "Original: "
+  # 届く順に流す (訳は例)。ja は日本語で見ている人向けに英語を日本語へ、en は英語で見ている人向けにいろいろな言語を英語へ。
+  # channel は party / guild (書かなければ全体のチャット)、rank は VIP / VIP+ / MVP / MVP+ / MVP++
+  lines:
+    ja:
+      - { rank: "MVP+", name: "Steve", original: "anyone want to do dungeons? we need a healer", translated: "ダンジョンに行く人はいますか？ ヒーラーを探しています。" }
+      - { channel: party, rank: "VIP", name: "Alex", original: "ready whenever you are", translated: "いつでも行けます" }
+      - { rank: "MVP++", name: "Sofia", original: "does anyone know where the Dwarven Mines entrance is?", translated: "Dwarven Mines の入り口がどこか知っている人はいますか？" }
+      - { channel: guild, rank: "MVP+", name: "Minji", original: "gg everyone, thanks for the carry", translated: "みんなお疲れさま、キャリーありがとう" }
+      - { rank: "VIP+", name: "Lucas", original: "selling Aspect of the End, 200k each", translated: "Aspect of the End を 1 本 20 万で売っています" }
+      - { rank: "MVP+", name: "Wei", original: "finally got my first dragon pet!!", translated: "ついに初めてのドラゴンのペットを手に入れた！！" }
+      - { channel: party, rank: "MVP++", name: "Hika", original: "let's start, everyone get in the portal", translated: "始めよう、みんなポータルに入って" }
+      - { rank: "VIP", name: "Chloe", original: "how do you unlock the Crystal Hollows?", translated: "Crystal Hollows はどうやって解放するの？" }
+      - { channel: guild, rank: "MVP+", name: "Yuki", original: "welcome back! long time no see", translated: "おかえり！ 久しぶり" }
+      - { rank: "MVP", name: "Mateo", original: "is the bazaar down or is it just me?", translated: "バザーが落ちてるのかな、それとも自分だけ？" }
+    en:
+      - { rank: "MVP+", name: "Hika", original: "ダンジョン行く人いる？ヒーラー募集中", translated: "Anyone going to dungeons? Looking for a healer" }
+      - { channel: party, rank: "VIP", name: "Lukas", original: "Bin bereit, wann ihr wollt", translated: "I'm ready whenever you are" }
+      - { rank: "MVP++", name: "Sofía", original: "¿alguien sabe dónde está la entrada a Dwarven Mines?", translated: "Does anyone know where the Dwarven Mines entrance is?" }
+      - { channel: guild, rank: "MVP+", name: "Minji", original: "다들 수고했어요, 캐리 고마워요", translated: "Good work everyone, thanks for the carry" }
+      - { rank: "VIP+", name: "Lucas", original: "vendo Aspect of the End, 200k cada", translated: "Selling Aspect of the End, 200k each" }
+      - { rank: "MVP+", name: "Wei", original: "终于拿到第一只龙宠物了！！", translated: "Finally got my first dragon pet!!" }
+      - { channel: party, rank: "MVP++", name: "Hika", original: "始めよう、みんなポータルに入って", translated: "Let's start, everyone get in the portal" }
+      - { rank: "VIP", name: "Chloé", original: "comment on débloque les Crystal Hollows ?", translated: "How do you unlock the Crystal Hollows?" }
+      - { channel: guild, rank: "MVP+", name: "Yuki", original: "おかえり！久しぶり", translated: "Welcome back! Long time no see" }
+      - { rank: "MVP", name: "Mateo", original: "¿el bazar está caído o solo soy yo?", translated: "Is the bazaar down or is it just me?" }
 features:
   - image: /assets/chat-translator/chat.jpg
     ja:

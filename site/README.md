@@ -20,7 +20,7 @@ https://aida0710.github.io/minecraft-java-mods/ のソース。`main` の `site/
 | `thumbnail` | 一覧のカードの画像 (16:9) |
 | `summary.ja` / `summary.en` | 1 文の説明 |
 | `video` / `video_poster` | 紹介動画と、再生前に出す画像 (無ければ省く) |
-| `demo` | ページの冒頭のチャット欄の動き (無ければ省く) |
+| `demo` | ページの冒頭のチャット欄に流す発言 (無ければ省く)。`ui` はボタンと説明の表記 (ゲーム内と同じ)、`lines.ja` / `lines.en` は届く順の発言。動きは `assets/js/chat-demo.js` |
 | `features` | できることの一覧。画像と、日本語・英語の見出しと説明 |
 
 本文 (front matter の後) は `<div data-lang="ja" markdown="1">` と `<div data-lang="en" markdown="1">` に分けて書く。画面の右上の「日本語 / English」で、選んだ方だけが表示される。
