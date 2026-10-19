@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.inventory.BookViewScreen
 import net.minecraft.world.Difficulty
 import net.minecraft.world.level.GameType
 import net.minecraft.world.level.LevelSettings
@@ -90,10 +91,25 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "cmd" -> mc.player!!.connection.sendCommand(args[1])
             // サーバーから § コード入りのシステムメッセージを受け取ったのと同じ経路で処理させる (Hypixel の再現)
             "inject" -> mc.gui.chatListener().handleSystemMessage(Component.literal(args[1].replace("\\n", "\n")), true)
-            "openchat" -> mc.gui.setScreen(ChatScreen("", false))
+            // チャット入力欄を開く ("openchat こんにちは" で入力欄に文字を入れて開く)
+            "openchat" -> mc.gui.setScreen(ChatScreen(args.getOrElse(1) { "" }, false))
+            // 開いている画面で Enter を押したときと同じ処理 (この mod が使わなければ画面に渡す)
+            "enter" -> {
+                val screen = mc.gui.screen()!!
+                val event = net.minecraft.client.input.KeyEvent(InputConstants.KEY_RETURN, 0, 0)
+                val consumed = ChatTranslator.instance.keys.onScreenKey(screen, event)
+                log("enter consumed=$consumed")
+                if (!consumed) screen.keyPressed(event)
+            }
+            "chatinput" -> log("chat input='${((mc.gui.screen() as? ChatScreen)?.focused as? net.minecraft.client.gui.components.EditBox)?.value}' screen=${mc.gui.screen()?.javaClass?.simpleName}")
+            // 見本の本を開く (2 ページ目はクリックできる文字なので訳さないはず)
+            "book" -> mc.gui.setScreen(BookViewScreen(BookViewScreen.BookAccess(SAMPLE_BOOK)))
+            "bookpages" -> (mc.gui.screen() as? BookViewScreen)?.bookAccess?.pages
+                ?.forEachIndexed { i, page -> log("page[$i] ${page.string.replace("\n", " / ")}") }
+                ?: log("not a book: ${mc.gui.screen()}")
             // 設定画面を開く ("settings 1" で 2 番目のタブ)。"dictedit" はユーザー辞書の編集画面
             "settings" -> SettingsScreen.open(null, args.getOrNull(1)?.toIntOrNull() ?: 0)
-            "dictedit" -> mc.gui.setScreen(UserDictionaryScreen(SettingsScreen(null, 2)))
+            "dictedit" -> mc.gui.setScreen(UserDictionaryScreen(SettingsScreen(null, SettingsScreen.TAB_DICTIONARY)))
             "keep" -> log("keep add=${ChatTranslator.instance.dictionaries.addKeep(args[1])}")
             // 設定値を直接変える: "set provider CLAUDE" など (画面の操作を模擬)
             "lang" -> { val (s, t) = args[1].split(" "); TranslatorConfig.update(TranslatorConfig.sourceCode, s); TranslatorConfig.update(TranslatorConfig.targetCode, t) }
@@ -130,6 +146,13 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "type" -> args[1].codePoints().forEach { mc.gui.screen()!!.charTyped(net.minecraft.client.input.CharacterEvent(it)) }
             "key" -> mc.gui.screen()!!.keyPressed(net.minecraft.client.input.KeyEvent(args[1].toInt(), 0, 0))
             "modlang" -> TranslatorConfig.update(TranslatorConfig.uiLanguage, args[1])
+            // 機能の ON/OFF を決める ("feature send on")。前回の確認の状態が残っていても同じ条件で始められる
+            "feature" -> {
+                val (id, state) = args[1].split(" ")
+                TranslatorConfig.update(Feature.byId(id)!!.setting, state == "on")
+            }
+            // 送信チャットの翻訳で、訳文を入力欄に入れて確認するか ("sendconfirm false" ですぐ送る)
+            "sendconfirm" -> TranslatorConfig.update(TranslatorConfig.sendConfirm, args[1].toBoolean())
             "config" -> TranslatorConfig.current.let { log("source=${it.sourceCode} target=${it.targetCode} ui=${it.uiLanguage} provider=${it.provider} dicts=${it.enabledDictionaries}") }
             "cache" -> log("cache size=${ChatTranslator.instance.cache.size()}")
             "cacheclear" -> ChatTranslator.instance.translator.clearCache()
@@ -185,4 +208,13 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
     }
 
     private fun log(message: String) = ChatTranslator.LOGGER.info("[SELFTEST] {}", message)
+
+    private companion object {
+        val SAMPLE_BOOK: List<Component> = listOf(
+            Component.literal("Welcome to the island!\nTalk to the villagers to start your adventure."),
+            Component.literal("Click here to warp to the hub")
+                .withStyle { it.withClickEvent(net.minecraft.network.chat.ClickEvent.RunCommand("warp hub")) },
+            Component.literal("Thanks for reading this book."),
+        )
+    }
 }

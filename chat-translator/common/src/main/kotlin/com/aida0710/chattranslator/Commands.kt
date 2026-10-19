@@ -30,6 +30,10 @@ class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
         SharedSuggestionProvider.suggest(Languages.ALL.map { it.code } + Languages.AUTO, builder)
     }
 
+    private val features = SuggestionProvider<S> { _, builder ->
+        SharedSuggestionProvider.suggest(Feature.entries.map { it.id }, builder)
+    }
+
     private fun dictionaryIds(mod: ChatTranslator) = SuggestionProvider<S> { _, builder ->
         SharedSuggestionProvider.suggest(mod.dictionaries.packs.map { it.id }, builder)
     }
@@ -55,6 +59,7 @@ class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
         val root = literal("chattranslator")
             .executes(ok { SettingsScreen.openLater() })
             .then(literal("config").executes(ok { SettingsScreen.openLater() }))
+            .then(literal("settings").executes(ok { SettingsScreen.openLater() }))
             .then(literal("status").executes(ok { ctx ->
                 val c = TranslatorConfig.current
                 val d = mod.dictionaries
@@ -62,7 +67,14 @@ class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
                 reply(ctx.source, T.tr("cmd.status.lang", Languages.displayName(c.sourceCode), Languages.displayName(c.targetCode), T.onOff(c.chatEnabled), T.onOff(c.tooltipEnabled)))
                 val active = d.packs.filter { d.isEnabled(it.id) }.map { d.displayName(it).string }
                 reply(ctx.source, T.tr("cmd.status.cache", mod.cache.size(), active.joinToString(", ")))
+                reply(ctx.source, T.tr("cmd.status.book_send", T.onOff(c.bookEnabled), T.onOff(c.sendEnabled), Languages.displayName(c.sendSourceCode), Languages.displayName(c.sendTargetCode)))
             }))
+            .then(literal("toggle").then(argument("feature", StringArgumentType.word()).suggests(features).executes(ok { ctx ->
+                val id = StringArgumentType.getString(ctx, "feature")
+                val feature = Feature.byId(id)
+                if (feature == null) reply(ctx.source, T.tr("cmd.toggle.unknown", id, Feature.entries.joinToString(", ") { it.id }), ChatFormatting.RED)
+                else reply(ctx.source, T.tr("cmd.toggle", feature.label, T.onOff(mod.toggle(feature))))
+            })))
             .then(literal("swap").then(argument("id", IntegerArgumentType.integer(0)).executes(ok { ctx ->
                 // チャットの [原文] / [訳] ボタンから実行される
                 if (!mod.chat.swap(IntegerArgumentType.getInteger(ctx, "id"))) reply(ctx.source, T.tr("cmd.swap.too_old"), ChatFormatting.GRAY)
@@ -88,6 +100,18 @@ class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
                         reply(ctx.source, T.tr("cmd.lang.set", Languages.displayName(source), Languages.displayName(target)))
                     }
                 }))))
+            .then(literal("send").then(literal("lang").then(argument("source", StringArgumentType.word()).suggests(languages)
+                .then(argument("target", StringArgumentType.word()).suggests(languages).executes(ok { ctx ->
+                    val source = StringArgumentType.getString(ctx, "source")
+                    val target = StringArgumentType.getString(ctx, "target")
+                    if (Languages.get(source) == null || Languages.get(target) == null) {
+                        reply(ctx.source, T.tr("cmd.lang.unknown"), ChatFormatting.RED)
+                    } else {
+                        TranslatorConfig.update(TranslatorConfig.sendSourceCode, source)
+                        TranslatorConfig.update(TranslatorConfig.sendTargetCode, target)
+                        reply(ctx.source, T.tr("cmd.send.lang", Languages.displayName(source), Languages.displayName(target)))
+                    }
+                })))))
             .then(literal("keep")
                 .then(literal("add").then(argument("term", StringArgumentType.greedyString()).executes(ok { ctx ->
                     val term = StringArgumentType.getString(ctx, "term").trim()

@@ -78,7 +78,7 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
     private fun translateParagraph(para: List<Line>, cfg: TranslatorConfig.Values): List<Component> {
         val originals = para.map { it.component }
         val joined = para.joinToString(" ") { it.trimmed }
-        val translated = translator.translateTooltipLine(joined)
+        val translated = translator.translateInBackground(joined)
         if (translated == null || translated == joined) return originals
 
         val key = "${cfg.tooltipShowOriginal}\u0000$joined\u0000$translated"

@@ -26,10 +26,14 @@ class Keybinds(private val mod: ChatTranslator) {
     val toggleOriginal = KeyMapping("key.chattranslator.toggle_original", InputConstants.UNKNOWN.value, category)
     val toggleChat = KeyMapping("key.chattranslator.toggle_chat", InputConstants.UNKNOWN.value, category)
     val toggleTooltip = KeyMapping("key.chattranslator.toggle_tooltip", InputConstants.UNKNOWN.value, category)
+    val toggleSend = KeyMapping("key.chattranslator.toggle_send", InputConstants.UNKNOWN.value, category)
     val openSettings = KeyMapping("key.chattranslator.open_settings", InputConstants.UNKNOWN.value, category)
 
+    /** 機能の ON/OFF を切り替えるキー */
+    private val featureKeys = mapOf(toggleChat to Feature.CHAT, toggleTooltip to Feature.TOOLTIP, toggleSend to Feature.SEND)
+
     /** 各ローダーの登録処理に渡す */
-    val mappings get() = listOf(holdOriginal, toggleOriginal, toggleChat, toggleTooltip, openSettings)
+    val mappings get() = listOf(holdOriginal, toggleOriginal, toggleChat, toggleTooltip, toggleSend, openSettings)
 
     /** toggleOriginal で切り替える原文表示の状態 (保存しない) */
     @Volatile var originalToggled = false
@@ -47,39 +51,34 @@ class Keybinds(private val mod: ChatTranslator) {
     /** ワールド内 (画面を開いていないとき) */
     fun onTick() {
         while (toggleOriginal.consumeClick()) doToggleOriginal()
-        while (toggleChat.consumeClick()) doToggleChat()
-        while (toggleTooltip.consumeClick()) doToggleTooltip()
+        for ((key, feature) in featureKeys) while (key.consumeClick()) mod.toggle(feature)
         while (openSettings.consumeClick()) SettingsScreen.open()
     }
 
-    /** 画面を開いているとき (インベントリ・チェストなど) のキー入力 */
-    fun onScreenKey(screen: net.minecraft.client.gui.screens.Screen, event: KeyEvent) {
-        if (!mod.ready()) return
+    /**
+     * 画面を開いているとき (インベントリ・チェストなど) のキー入力。
+     * @return true ならこのキーはここで使った (各ローダーの入口は画面の既定の処理を止める)
+     */
+    fun onScreenKey(screen: net.minecraft.client.gui.screens.Screen, event: KeyEvent): Boolean {
+        if (!mod.ready()) return false
+        // チャット欄の Enter は、送信するチャットの翻訳に回す
+        if (screen is ChatScreen && event.isConfirmation) return mod.send.onEnter(screen)
         // 文字入力中 (チャット欄・検索欄など) はショートカットとして扱わない
-        if (screen is ChatScreen || screen.focused is EditBox || screen is SettingsScreen) return
+        if (screen is ChatScreen || screen.focused is EditBox || screen is SettingsScreen) return false
+        // ショートカットはキーを消費しない (インベントリなどの画面の操作もそのまま効く)
         when {
-            !toggleOriginal.isUnbound && toggleOriginal.matches(event) -> doToggleOriginal()
-            !toggleChat.isUnbound && toggleChat.matches(event) -> doToggleChat()
-            !toggleTooltip.isUnbound && toggleTooltip.matches(event) -> doToggleTooltip()
-            !openSettings.isUnbound && openSettings.matches(event) -> Minecraft.getInstance().execute { SettingsScreen.open(screen) }
+            isPressed(toggleOriginal, event) -> doToggleOriginal()
+            isPressed(openSettings, event) -> Minecraft.getInstance().execute { SettingsScreen.open(screen) }
+            else -> featureKeys.entries.firstOrNull { isPressed(it.key, event) }?.let { mod.toggle(it.value) }
         }
+        return false
     }
+
+    private fun isPressed(key: KeyMapping, event: KeyEvent) = !key.isUnbound && key.matches(event)
 
     private fun doToggleOriginal() {
         originalToggled = !originalToggled
         mod.showToggle(T.tr("toggle.original"), originalToggled)
-    }
-
-    private fun doToggleChat() {
-        val on = !TranslatorConfig.current.chatEnabled
-        TranslatorConfig.update(TranslatorConfig.chatEnabled, on)
-        mod.showToggle(T.tr("toggle.chat"), on)
-    }
-
-    private fun doToggleTooltip() {
-        val on = !TranslatorConfig.current.tooltipEnabled
-        TranslatorConfig.update(TranslatorConfig.tooltipEnabled, on)
-        mod.showToggle(T.tr("toggle.tooltip"), on)
     }
 
     companion object {

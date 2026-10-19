@@ -26,6 +26,8 @@ class LangFilesTest {
         val conditional = Regex("""T\.tr\(if \([^)]*\) "([a-z0-9_.]+)" else "([a-z0-9_.]+)"""").findAll(code).flatMap { listOf(it.groupValues[1], it.groupValues[2]) }
         val dynamic = ProviderType.entries.map { "provider.${it.name.lowercase()}" } +
             ChatDisplayMode.entries.map { "settings.display.${it.name.lowercase()}" } +
+            SendFormat.entries.map { "settings.send.format.${it.name.lowercase()}" } +
+            Feature.entries.map { "toggle.${it.id}" } +
             ModelPreset.entries.flatMap { listOf("model.${it.key}", "model.${it.key}.short") } +
             listOf("on", "off", "settings.uilang.auto")
         return (direct + conditional + dynamic).map { "chattranslator.$it" }.toSet()

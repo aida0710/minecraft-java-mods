@@ -23,7 +23,8 @@ class FabricEntry : ClientModInitializer {
         KeyMapping.Category.register(mod.keys.category.id())
         mod.keys.mappings.forEach { KeyMappingHelper.registerKeyMapping(it) }
         ScreenEvents.AFTER_INIT.register { _, screen, _, _ ->
-            ScreenKeyboardEvents.beforeKeyPress(screen).register { s, event -> mod.keys.onScreenKey(s, event) }
+            // false を返すと画面の既定の処理 (チャット欄の送信など) が動かない
+            ScreenKeyboardEvents.allowKeyPress(screen).register { s, event -> !mod.keys.onScreenKey(s, event) }
         }
         val commands = Commands<FabricClientCommandSource> { source, message -> source.sendFeedback(message) }
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ -> commands.register(dispatcher, mod) }

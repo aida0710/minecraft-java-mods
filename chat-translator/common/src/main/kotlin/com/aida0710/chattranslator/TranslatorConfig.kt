@@ -2,6 +2,9 @@ package com.aida0710.chattranslator
 
 enum class ChatDisplayMode { REPLACE, APPEND }
 
+/** 送信するチャットの形 */
+enum class SendFormat { TRANSLATION, TRANSLATION_AND_ORIGINAL }
+
 /**
  * config/chattranslator-client.toml の定義。読み込み・変更のたびに [current] を差し替える。
  * 設定画面からは [update] で値を書き換える (即保存)。
@@ -49,6 +52,15 @@ object TranslatorConfig {
         val maxCacheEntries: Int,
         // dictionaries
         val enabledDictionaries: List<String>,
+        // books
+        val bookEnabled: Boolean,
+        // sending
+        val sendEnabled: Boolean,
+        val sendSourceCode: String,
+        val sendTargetCode: String,
+        val sendFormat: SendFormat,
+        val sendConfirm: Boolean,
+        val sendCommands: List<String>,
     ) {
         /** キャッシュのキーに使う識別子 (エンジン・モデル・言語を変えたら訳し直す) */
         val modelKey: String
@@ -61,6 +73,9 @@ object TranslatorConfig {
                 }
                 return "$provider:$model:$sourceCode>$targetCode"
             }
+
+        /** 送信するチャットの翻訳用 (翻訳元・翻訳先を送信用の言語に入れ替える) */
+        fun forSending(): Values = copy(sourceCode = sendSourceCode, targetCode = sendTargetCode)
 
         fun buildPrompt(text: String): String = openaiPromptTemplate
             .replace("\\n", "\n")
@@ -162,6 +177,26 @@ object TranslatorConfig {
     val cachePersist = BooleanSetting("cache.persist", true, "翻訳結果のキャッシュをファイルに保存し、次回起動時も使う (false ならゲーム終了で消える)")
     val maxCache = IntSetting("cache.maxEntries", 20000, 100..1_000_000, "キャッシュの最大件数")
 
+    val bookEnabled = BooleanSetting("book.enabled", true, "本 (記入済みの本・書見台) の中身を翻訳する。クリックできる文字を含むページは原文のまま")
+
+    val sendEnabled = BooleanSetting("send.enabled", false, "自分が送信するチャットを翻訳してから送る")
+    val sendSourceCode = StringSetting("send.source", "ja", "送信するチャットの翻訳元 (自分が書く言語) の言語コード")
+    val sendTargetCode = StringSetting("send.target", "en", "送信するチャットの翻訳先の言語コード")
+    val sendFormat = EnumSetting(
+        "send.format", SendFormat.TRANSLATION, SendFormat.entries,
+        "TRANSLATION:              訳文だけを送る",
+        "TRANSLATION_AND_ORIGINAL: 「訳文 (原文)」の形で送る (256 文字を超える場合は訳文だけ)",
+    )
+    val sendConfirm = BooleanSetting(
+        "send.confirm", true,
+        "true: 訳文を入力欄に入れ、もう一度 Enter を押したら送る (送る前に確認できる)",
+        "false: Enter で翻訳してそのまま送る",
+    )
+    val sendCommands = StringListSetting(
+        "send.commands", listOf("pc", "gc", "oc", "ac", "shout", "r", "msg 1", "w 1", "tell 1", "whisper 1"),
+        "本文を翻訳するコマンド。\"msg 1\" は最初の 1 語 (宛先) を残して後ろを翻訳する。ここに無いコマンドは翻訳しない",
+    )
+
     val enabledDictionaries = StringListSetting(
         "dictionaries.enabled", listOf("hypixel-skyblock", "user"),
         "有効な辞書 (config/chattranslator/dictionaries/<id>.json)",
@@ -179,6 +214,8 @@ object TranslatorConfig {
         claudeApiKey, claudeModel, deeplApiKey, googleApiKey,
         cachePersist, maxCache,
         enabledDictionaries,
+        bookEnabled,
+        sendEnabled, sendSourceCode, sendTargetCode, sendFormat, sendConfirm, sendCommands,
     )
 
     /** 読み込み前 (テストなど) は null で、[current] は既定値のまま */
@@ -205,6 +242,9 @@ object TranslatorConfig {
         T.setUiLanguage(current.uiLanguage)
         listeners.forEach { it(current) }
     }
+
+    /** ファイルの今の値 (読み込み前は既定値) */
+    operator fun <T : Any> get(setting: Setting<T>): T = file?.get(setting) ?: setting.default
 
     /** 値を変更して即保存する (設定画面・キー操作・コマンドから) */
     @Synchronized
@@ -255,6 +295,13 @@ object TranslatorConfig {
             cachePersist = v(cachePersist),
             maxCacheEntries = v(maxCache),
             enabledDictionaries = v(enabledDictionaries),
+            bookEnabled = v(bookEnabled),
+            sendEnabled = v(sendEnabled),
+            sendSourceCode = v(sendSourceCode),
+            sendTargetCode = v(sendTargetCode),
+            sendFormat = v(sendFormat),
+            sendConfirm = v(sendConfirm),
+            sendCommands = v(sendCommands),
         )
     }
 }
