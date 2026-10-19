@@ -47,7 +47,9 @@ class ChatTranslator(configDir: Path) {
     private val notices = ConcurrentLinkedQueue<Pair<Component, Boolean>>()
     /** 未設定の案内を 1 セッションに 1 回だけ出す */
     private var notifiedNotReady = false
+    private var lastProvider: ProviderType? = null
 
+    // 上のプロパティの初期化が済んでから起動する (Kotlin は宣言順に初期化するため、init はプロパティより後に置く)
     init {
         instance = this
         TranslatorConfig.load(configDir.resolve("$MODID-client.toml"))
@@ -90,8 +92,6 @@ class ChatTranslator(configDir: Path) {
         }, "ChatTranslator-shutdown"))
         LOGGER.info("ChatTranslator ready: provider={} model={} cache={} entries", cfg.provider, cfg.modelKey, cache.size())
     }
-
-    private var lastProvider: ProviderType? = null
 
     /** 設定画面などで値が変わったときに各部へ反映する */
     private fun onSettingsChanged(cfg: TranslatorConfig.Values) {

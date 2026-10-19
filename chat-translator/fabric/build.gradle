@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    // 1.19 は Gradle 9.8 以上が必要なため、ForgeGradle と同じ Gradle 9.7 で動く 1.18 系を使う
+    id 'net.fabricmc.fabric-loom' version '1.18.4'
+    id 'org.jetbrains.kotlin.jvm'
+    id 'com.gradleup.shadow'
+}
+
+apply from: rootProject.file('gradle/loader.gradle')
+
+repositories {
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases'
+        content { includeGroup 'com.terraformersmc' }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    // mod 一覧 (Mod Menu) の「設定」ボタン。入っていなくても動く
+    compileOnly 'com.terraformersmc:modmenu:21.0.0'
+}
+
+loom {
+    // ChatComponent の非公開メンバーを使う (Forge / NeoForge の accesstransformer.cfg と同じ内容)
+    accessWidenerPath = file('src/main/resources/chattranslator.classtweaker')
+
+    mods {
+        chattranslator {
+            sourceSet sourceSets.main
+        }
+    }
+
+    runs {
+        client {
+            client()
+            runDir 'run'
+            // ./gradlew :fabric:runClient -Pselftest=<dir> で自動テスト用に起動する
+            if (project.hasProperty('selftest')) property 'chattranslator.selftest', project.property('selftest').toString()
+        }
+    }
+}

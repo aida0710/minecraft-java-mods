@@ -66,6 +66,15 @@ class ChatHandler(private val translator: Translator) {
         return null
     }
 
+    /**
+     * 表示前に差し替えられないメッセージ (Fabric のプレイヤー発言) 用。
+     * [onMessage] が返した差し替え後の内容を、チャット欄に載った後の同じ行へ反映する
+     */
+    fun replaceAfterShown(original: Component, replacement: Component) {
+        // execute は描画スレッド上ではその場で動き、まだチャット欄に載っていない行を探してしまうため schedule
+        Minecraft.getInstance().schedule { replaceInChat(original, replacement) }
+    }
+
     /** [原文] / [訳] ボタンから呼ばれる */
     fun swap(id: Int): Boolean {
         val entry = entries[id] ?: return false

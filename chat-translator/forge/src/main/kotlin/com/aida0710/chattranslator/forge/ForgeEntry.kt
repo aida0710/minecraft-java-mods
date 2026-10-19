@@ -3,6 +3,7 @@ package com.aida0710.chattranslator.forge
 import com.aida0710.chattranslator.ChatTranslator
 import com.aida0710.chattranslator.Commands
 import com.aida0710.chattranslator.SettingsScreen
+import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.commands.CommandSourceStack
@@ -30,6 +31,7 @@ class ForgeEntry(context: FMLJavaModLoadingContext) {
             ConfigScreenHandler.ConfigScreenFactory { _: Minecraft, parent: Screen -> SettingsScreen(parent) }
         }
 
+        KeyMapping.Category.register(mod.keys.category.id())
         RegisterKeyMappingsEvent.BUS.addListener { ev -> mod.keys.mappings.forEach { ev.register(it) } }
         ScreenEvent.KeyPressed.Pre.BUS.addListener(Consumer { ev -> mod.keys.onScreenKey(ev.screen, ev.info) })
         val commands = Commands<CommandSourceStack> { source, message -> source.sendSystemMessage(message) }

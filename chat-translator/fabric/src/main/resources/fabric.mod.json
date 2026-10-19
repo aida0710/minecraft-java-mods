@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "chattranslator",
+  "version": "${mod_version}",
+  "name": "Chat Translator",
+  "description": "Translates chat and item tooltips with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs. チャットとアイテムの説明文を翻訳します (日本語 / English / 简体中文 UI)。",
+  "authors": ["aida0710"],
+  "contact": {
+    "homepage": "https://github.com/aida0710/minecraft-forge-mods",
+    "sources": "https://github.com/aida0710/minecraft-forge-mods",
+    "issues": "https://github.com/aida0710/minecraft-forge-mods/issues"
+  },
+  "license": "All Rights Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.aida0710.chattranslator.fabric.FabricEntry"],
+    "modmenu": ["com.aida0710.chattranslator.fabric.ModMenuEntry"]
+  },
+  "accessWidener": "chattranslator.classtweaker",
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

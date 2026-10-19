@@ -133,6 +133,8 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             "config" -> TranslatorConfig.current.let { log("source=${it.sourceCode} target=${it.targetCode} ui=${it.uiLanguage} provider=${it.provider} dicts=${it.enabledDictionaries}") }
             "cache" -> log("cache size=${ChatTranslator.instance.cache.size()}")
             "cacheclear" -> ChatTranslator.instance.translator.clearCache()
+            // キー設定画面 (この mod の見出しが登録できているかの確認用)
+            "keybinds" -> mc.gui.setScreen(net.minecraft.client.gui.screens.options.controls.KeyBindsScreen(SettingsScreen(null), mc.options))
             "close" -> mc.gui.setScreen(null)
             "screenshot" -> Screenshot.grab(mc.gameDirectory, args.getOrElse(1) { "selftest" } + ".png", mc.gameRenderer.mainRenderTarget(), 1) { log("screenshot: ${it.string}") }
             "holdkey" -> log("J held=${InputConstants.isKeyDown(InputConstants.KEY_J)}")

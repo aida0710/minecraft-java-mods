@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev'
+    id 'org.jetbrains.kotlin.jvm'
+    id 'com.gradleup.shadow'
+}
+
+apply from: rootProject.file('gradle/loader.gradle')
+
+neoForge {
+    version = neoforge_version
+    accessTransformers.from(rootProject.file('common/src/main/resources/META-INF/accesstransformer.cfg'))
+
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('run')
+            // ./gradlew :neoforge:runClient -Pselftest=<dir> で自動テスト用に起動する
+            if (project.hasProperty('selftest')) systemProperty 'chattranslator.selftest', project.property('selftest').toString()
+        }
+    }
+
+    mods {
+        chattranslator {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+// 開発実行では、mod ではないライブラリ (Kotlin 標準ライブラリ・NightConfig) はここに足さないと読み込まれない
+configurations {
+    additionalRuntimeClasspath.extendsFrom shade
+}

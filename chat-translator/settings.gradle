@@ -20,5 +20,5 @@ plugins {
 rootProject.name = 'chat-translator'
 
 // common: 全ローダーで共有するコード (バニラの Minecraft に対してコンパイルし、単体テストもここで行う)
-// forge: ローダーの入口。common のソースを取り込んで 1 つの jar にする
-include 'common', 'forge'
+// forge / neoforge / fabric: 各ローダーの入口。common のソースを取り込んで 1 つの jar にする
+include 'common', 'forge', 'neoforge', 'fabric'

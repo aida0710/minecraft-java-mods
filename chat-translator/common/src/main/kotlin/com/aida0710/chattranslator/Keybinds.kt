@@ -14,7 +14,11 @@ import net.minecraft.resources.Identifier
  * 画面中のキー入力は各ローダーの画面のキー入力イベントから [onScreenKey] に渡し、どこでも効くようにしている。
  */
 class Keybinds(private val mod: ChatTranslator) {
-    private val category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(ChatTranslator.MODID, "main"))
+    /**
+     * キー設定画面の「Chat Translator」の見出し。登録は各ローダーの入口で行う
+     * (NeoForge はバニラの KeyMapping.Category.register ではなく専用の登録イベントを使う)
+     */
+    val category = KeyMapping.Category(Identifier.fromNamespaceAndPath(ChatTranslator.MODID, "main"))
 
     /** 押している間ツールチップを原文表示 (既定: J) */
     val holdOriginal = KeyMapping("key.chattranslator.show_original", InputConstants.KEY_J, category)
@@ -36,8 +40,7 @@ class Keybinds(private val mod: ChatTranslator) {
 
     /** インベントリ画面中は KeyMapping の状態が更新されないため、キーボードの生の状態を見る */
     private fun isHeld(key: KeyMapping): Boolean {
-        // 割り当て中のキーを返す getter はバニラに無い (Forge だけが足している) ため、保存用の名前から引く
-        val k = InputConstants.getKey(key.saveString())
+        val k = boundKey(key)
         return k.type == InputConstants.Type.KEYBOARD && k.value > 0 && InputConstants.isKeyDown(k.value)
     }
 
@@ -77,5 +80,10 @@ class Keybinds(private val mod: ChatTranslator) {
         val on = !TranslatorConfig.current.tooltipEnabled
         TranslatorConfig.update(TranslatorConfig.tooltipEnabled, on)
         mod.showToggle(T.tr("toggle.tooltip"), on)
+    }
+
+    companion object {
+        /** 割り当て中のキー。それを返す getter はバニラに無い (Forge だけが足している) ため、保存用の名前から引く */
+        internal fun boundKey(mapping: KeyMapping): InputConstants.Key = InputConstants.getKey(mapping.saveString())
     }
 }
