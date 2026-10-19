@@ -1,14 +1,14 @@
 modLoader="javafml"
 loaderVersion="[4,)"
 license="All Rights Reserved"
-issueTrackerURL="https://github.com/aida0710/minecraft-forge-mods/issues"
+issueTrackerURL="https://github.com/aida0710/minecraft-java-mods/issues"
 
 [[mods]]
 modId="chattranslator"
 version="${mod_version}"
 displayName="Chat Translator"
 authors="aida0710"
-displayURL="https://github.com/aida0710/minecraft-forge-mods"
+displayURL="https://aida0710.github.io/minecraft-java-mods/chat-translator/"
 description='''
 Translates chat and item tooltips with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
 チャットとアイテムの説明文を翻訳します (日本語 / English / 简体中文 UI)。
