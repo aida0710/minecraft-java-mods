@@ -1,12 +1,15 @@
-# Chat Translator (Forge 26.3 / Kotlin)
+# Chat Translator (Minecraft 26.3 / Forge・NeoForge・Fabric / Kotlin)
 
 受信チャットと**アイテムのツールチップ (名前・説明文)** を翻訳するクライアント専用 mod です。Hypixel SkyBlock での利用を想定していますが、どのサーバーでも使えます。
 
-- 対応: Minecraft **26.3** / Forge **66.0.x** / Java 25
+- 対応: Minecraft **26.3** / Java 25
+  - Forge **66.0.x**
+  - NeoForge **26.3.0.x**
+  - Fabric (Fabric Loader 0.19.5 以降 + **Fabric API** が必要。[Mod Menu](https://modrinth.com/mod/modmenu) があれば mod 一覧から設定を開ける)
 - 翻訳エンジン: **内蔵 LLM** (llama.cpp + TranslateGemma、設定画面からインストール) / OpenAI 互換 API (Ollama・LM Studio・OpenAI・Gemini など) / Claude API / DeepL API / Google 翻訳 API
 - 翻訳の言語: 翻訳元・翻訳先を自由に選択 (日本語・英語・中国語・韓国語ほか約 30 言語、翻訳元は自動検出も可)
 - mod の画面表示: **日本語 / English / 简体中文** (既定は Minecraft の言語設定に合わせる。「一般」タブの「mod の表示言語」で固定も可)
-- 実装言語: Kotlin (標準ライブラリは jar に同梱済み。Kotlin for Forge は不要)
+- 実装言語: Kotlin (標準ライブラリは jar に同梱済み。Kotlin for Forge や Fabric Language Kotlin は不要)
 
 ![チャット翻訳の例](docs/chat.png)
 
@@ -14,7 +17,10 @@
 
 ## 1. 導入
 
-1. [Actions](https://github.com/aida0710/minecraft-forge-mods/actions) の最新ビルドの Artifact、または Release から `chattranslator-x.y.z.jar` を取得
+1. [Actions](https://github.com/aida0710/minecraft-forge-mods/actions) の最新ビルドの Artifact、または Release から、使うローダーの jar を取得
+   - Forge: `chattranslator-forge-x.y.z.jar`
+   - NeoForge: `chattranslator-neoforge-x.y.z.jar`
+   - Fabric: `chattranslator-fabric-x.y.z.jar` (Fabric API も `mods/` に入れる)
 2. `.minecraft/mods/` (Prism Launcher ならインスタンスの `mods/`) に配置して起動
 3. ワールドかサーバーに入り、`/chattranslator` (または mod 一覧の「設定」) で設定画面を開く (タブは「一般 / 翻訳エンジン / 辞書 / キャッシュ / バックアップ」)
 4. 「翻訳エンジン」タブで使うエンジンを選ぶ
@@ -125,6 +131,7 @@
 - ツールチップの段落は「同じ色の行が続く」ことで判定しているため、まれに区切りがずれることがあります
 - 表示言語を切り替えても、すでにチャット欄にある行は切り替え前の言語のままです (バニラと同じ仕様)
 - 「mod の表示言語」を固定しても、操作設定画面 (キー割り当て) に出るキーの名前は Minecraft の言語のままです
+- Fabric では、署名付きのプレイヤー発言 (Hypixel 以外のサーバーの通常のチャット) を表示前に書き換える手段が無いため、いったん原文で表示してから同じ行を訳文に置き換えます。Hypixel のメッセージはシステムメッセージなので、ほかのローダーと同じく表示前に置き換わります
 - 4B モデルはゲーム内スラング (`f7` = フロア 7、`900m` = 9 億コイン など) を誤訳しがちです
 - この mod はクライアント側の表示を変えるだけで、サーバーへ何かを送信することはありません。Hypixel のルール (Allowed Modifications) に照らしての利用可否はご自身で判断してください
 
@@ -132,20 +139,28 @@
 
 ```powershell
 cd chat-translator
-./gradlew build       # build/libs/chattranslator-<version>.jar が配布用 (Kotlin 同梱)
-./gradlew runClient   # 開発用クライアント起動
+./gradlew build                # 3 つのローダーの jar と単体テスト
+./gradlew :forge:runClient     # 開発用クライアント起動 (:neoforge:runClient / :fabric:runClient も同様)
 ```
 
-JDK 25 は Gradle (foojay) が自動で取得します。Gradle の起動自体には Java 17 以上が必要です。
+配布用の jar は `forge/build/libs/chattranslator-forge-<version>.jar` (NeoForge・Fabric も同じ形) です。Kotlin 標準ライブラリと設定ファイル用の NightConfig を同梱しています。
 
-画面の文字列は `src/main/resources/assets/chattranslator/lang/` の `en_us.json` / `ja_jp.json` / `zh_cn.json` にあります。`LangFilesTest` が、コードで使っているキーがすべての言語にあるかを確認します。
+| フォルダ | 中身 |
+| --- | --- |
+| `common/` | 全ローダー共通のコード・画面の文字列・辞書・単体テスト。バニラの Minecraft に対してコンパイルするので、ローダー固有の API を使うとここで失敗します |
+| `forge/` `neoforge/` `fabric/` | 各ローダーの入口 (イベントを `ChatTranslator` に渡すだけ) と mod 情報ファイル。common のソースを取り込んで 1 つの jar にします |
+| `gradle/loader.gradle` | 3 つのローダーで共通のビルド設定 (common の取り込み、ライブラリの同梱) |
+
+JDK 25 は Gradle (foojay) が自動で取得し、Gradle 自体もその JDK 25 で動きます (`gradle/gradle-daemon-jvm.properties`)。Gradle の起動自体には Java 17 以上が必要です。
+
+画面の文字列は `common/src/main/resources/assets/chattranslator/lang/` の `en_us.json` / `ja_jp.json` / `zh_cn.json` にあります。`LangFilesTest` が、コードで使っているキーがすべての言語にあるかを確認します。
 
 ### 自動テスト (開発者向け)
 
 `-Pselftest=<dir>` を付けて起動すると、`<dir>/commands.txt` に追記したコマンドを実行し `[SELFTEST]` としてログに出します。
 
 ```powershell
-./gradlew runClient -Pselftest="$PWD/run/selftest"
+./gradlew :forge:runClient -Pselftest="$PWD/run/selftest"   # :neoforge:runClient / :fabric:runClient も同様
 # 別ターミナルで
 echo "world selftest" >> run/selftest/commands.txt              # 新規ワールドを作成して入る
 echo "inject §b[MVP§c+§b] Steve§f: hello there" >> run/selftest/commands.txt   # サーバーからのメッセージを再現
@@ -153,5 +168,5 @@ echo "dump 5" >> run/selftest/commands.txt                       # チャット�
 echo "tooltip" >> run/selftest/commands.txt                      # SkyBlock 風アイテムのツールチップ翻訳を確認
 echo "settings 1" >> run/selftest/commands.txt                   # 設定画面 (2 番目のタブ) を開く
 echo "uilang zh_cn" >> run/selftest/commands.txt                 # 表示言語を切り替える
-echo "screenshot test" >> run/selftest/commands.txt              # run/screenshots/test.png
+echo "screenshot test" >> run/selftest/commands.txt              # forge/run/screenshots/test.png (ローダーごとの run フォルダ)
 ```
