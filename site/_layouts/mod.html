@@ -19,16 +19,18 @@ layout: default
       </p>
     </div>
     {% if page.demo %}
-    <figure class="chat-demo" aria-label="{{ page.demo.prefix }}{{ page.demo.original }}">
+    <!-- 中身は chat-demo.js が作る。スクリプトが動かない環境では欄ごと出さない -->
+    <figure class="chat-demo" data-chat-demo hidden>
+      <script type="application/json" class="chat-demo-data">{{ page.demo | jsonify }}</script>
       <div class="chat-box">
-        <p class="chat-line chat-original"><span style="color: {{ page.demo.prefix_color }}">{{ page.demo.prefix }}</span>{{ page.demo.original }}</p>
-        <p class="chat-line chat-translated" aria-hidden="true"><span style="color: {{ page.demo.prefix_color }}">{{ page.demo.prefix }}</span>{{ page.demo.translated }} <span class="chat-button" data-lang="ja">[原文]</span><span class="chat-button" data-lang="en">[Original]</span></p>
+        <ol class="chat-lines" aria-live="off"></ol>
       </div>
       <figcaption>
-        <span data-lang="ja">届いた英語のチャットが、同じ行のまま日本語に変わります</span>
-        <span data-lang="en">An incoming chat line is replaced with its translation in place</span>
+        <span data-lang="ja">届いたチャットが、同じ行のまま日本語に変わります。訳文にカーソルを合わせると (スマホでは押すと) 原文が見え、[原文] で切り替えられます。発言と訳は例です</span>
+        <span data-lang="en">Incoming chat turns into English on the same line. Hover over a translation (tap on phones) to see the original, or click [Original] to switch. The messages are examples</span>
       </figcaption>
     </figure>
+    <script src="{{ '/assets/js/chat-demo.js' | relative_url }}"></script>
     {% endif %}
   </div>
   <div class="ground" aria-hidden="true"></div>

@@ -214,67 +214,86 @@ a {
     var(--dirt-pattern) 0 0 / 40px 40px;
 }
 
-/* ---- チャット欄の動き (英語の行が日本語に変わる) ---- */
+/* ---- チャット欄 (chat-demo.js が発言を流し、届いた行を訳文に置き換える) ---- */
 
 .chat-demo {
   margin: 0;
 }
 
-/* 英語の行と日本語の行を同じ場所に重ね、片方ずつ見せる */
+/* 届いた行が下から押し上げ、古い行は上の端で薄れて消える (ゲーム内のチャット欄と同じ向き) */
 .chat-box {
-  display: grid;
+  --visible-lines: 9;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: calc(var(--visible-lines) * 1.6em + 20px);
   padding: 10px 14px;
+  overflow: hidden;
+  font-family: var(--pixel);
+  font-size: 15px;
+  line-height: 1.6;
   background: rgba(0, 0, 0, 0.5);
+  mask-image: linear-gradient(transparent, #000 3.2em);
+}
+
+.chat-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .chat-line {
-  margin: 0;
-  font-family: var(--pixel);
-  font-size: 17px;
-  line-height: 1.6;
   color: var(--mc-white);
   text-shadow: 2px 2px 0 var(--text-shadow);
 }
 
-.chat-original,
-.chat-translated {
-  grid-area: 1 / 1;
-}
-
-.chat-original {
-  animation: chat-original 8s steps(1, end) infinite;
-}
-
-.chat-translated {
-  opacity: 0;
-  animation: chat-translated 8s steps(1, end) infinite;
-}
-
-.chat-button {
-  color: #555555;
-  text-shadow: none;
-}
-
-@keyframes chat-original {
-  0% { opacity: 1; }
-  30% { opacity: 0; }
-  100% { opacity: 0; }
+/* 訳文に変わった瞬間だけ少し光らせ、どの行が置き換わったかを見せる */
+.chat-body.just-translated {
+  animation: chat-translated 0.6s ease-out;
 }
 
 @keyframes chat-translated {
-  0% { opacity: 0; }
-  30% { opacity: 1; }
-  100% { opacity: 1; }
+  from { background: rgba(255, 255, 255, 0.18); }
+  to { background: transparent; }
+}
+
+/* [原文] / [訳]。ゲーム内は暗い灰色 (#555555) だが、空の色が透ける欄では見えないので少し明るくする。
+   押せることが分かるよう、カーソルを合わせるとさらに明るくする */
+.chat-button {
+  padding: 0;
+  font: inherit;
+  color: #8b8b8b;
+  text-shadow: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.chat-button:hover,
+.chat-button:focus-visible {
+  color: var(--mc-gray);
+}
+
+.chat-tooltip {
+  position: fixed;
+  z-index: 10;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 4px 8px;
+  font-family: var(--pixel);
+  font-size: 15px;
+  line-height: 1.5;
+  text-shadow: 2px 2px 0 var(--text-shadow);
+  pointer-events: none;
+}
+
+/* .tooltip-box の display: block より優先して隠す */
+.chat-tooltip[hidden] {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-original {
+  .chat-body.just-translated {
     animation: none;
-    opacity: 0;
-  }
-  .chat-translated {
-    animation: none;
-    opacity: 1;
   }
 }
 
@@ -502,8 +521,8 @@ a {
   .sky-inner {
     padding: 132px 16px 48px;
   }
-  .chat-line {
-    font-size: 16px;
+  .chat-box {
+    --visible-lines: 8;
   }
   .gui-panel {
     margin: 24px 8px;
