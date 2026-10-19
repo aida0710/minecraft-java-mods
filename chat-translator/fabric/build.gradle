@@ -43,3 +43,22 @@ loom {
         }
     }
 }
+
+// 配布用の jar (ライブラリ同梱済み) を、開発用のクラスフォルダではなく本番と同じ形で起動して確かめる。
+// ./gradlew :fabric:runProductionClient -Pselftest=<dir>
+configurations {
+    productionMods { transitive = false }
+}
+
+dependencies {
+    productionMods "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+}
+
+tasks.register('runProductionClient', net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+    // 既定では同梱前の jar (remapJar) も足されるため、同梱済みの jar に置き換える
+    mods.setFrom(tasks.named('shadowJar'), configurations.productionMods)
+    runDir = layout.projectDirectory.dir('run/production')
+    // 画面の無い環境では、呼び出す側で xvfb-run を使う
+    useXVFB = false
+    if (project.hasProperty('selftest')) jvmArgs.add("-Dchattranslator.selftest=${project.property('selftest')}".toString())
+}

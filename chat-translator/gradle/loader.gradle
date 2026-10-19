@@ -54,7 +54,9 @@ tasks.named('shadowJar') {
     relocate 'kotlin', 'com.aida0710.chattranslator.shadow.kotlin'
     relocate 'com.electronwill.nightconfig', 'com.aida0710.chattranslator.shadow.nightconfig'
     // 同梱するとローダーのモジュールシステムと衝突するため除外
-    exclude 'module-info.class', 'META-INF/versions/*/module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
+    exclude 'module-info.class', 'META-INF/*.kotlin_module', 'META-INF/maven/**'
+    // NightConfig の Java 17 向けクラス (使っていない serde 機能) は同梱しない
+    exclude 'META-INF/versions/**'
     // kotlin-stdlib が依存する注釈ライブラリは Minecraft 側にもあり、同梱すると衝突しうる
     exclude 'org/intellij/**', 'org/jetbrains/annotations/**'
     manifest.attributes('Implementation-Version': mod_version)

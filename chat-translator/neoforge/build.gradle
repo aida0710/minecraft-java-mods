@@ -18,6 +18,14 @@ neoForge {
             // ./gradlew :neoforge:runClient -Pselftest=<dir> で自動テスト用に起動する
             if (project.hasProperty('selftest')) systemProperty 'chattranslator.selftest', project.property('selftest').toString()
         }
+        // 配布用の jar (ライブラリ同梱済み) を run/production/mods に置き、開発用のクラスフォルダを読まずに起動して確かめる。
+        // ./gradlew :neoforge:runProductionClient -Pselftest=<dir>
+        productionClient {
+            client()
+            gameDirectory = project.file('run/production')
+            loadedMods = []
+            if (project.hasProperty('selftest')) systemProperty 'chattranslator.selftest', project.property('selftest').toString()
+        }
     }
 
     mods {
@@ -31,3 +39,9 @@ neoForge {
 configurations {
     additionalRuntimeClasspath.extendsFrom shade
 }
+
+def copyProductionJar = tasks.register('copyProductionJar', Sync) {
+    from tasks.named('shadowJar')
+    into layout.projectDirectory.dir('run/production/mods')
+}
+tasks.named('runProductionClient') { dependsOn copyProductionJar }

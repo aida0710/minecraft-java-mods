@@ -128,6 +128,7 @@
 ## 6. 既知の制限
 
 - 初めて見る文は、翻訳が終わるまで数秒間は原文のまま表示されます
+- 設定ファイル (`config/chattranslator-client.toml`) は起動時に 1 回だけ読みます。ゲーム中に直接書き換えても反映されず、その後に設定画面で何か変えるとファイルは上書きされます。手で編集するときはゲームを閉じてから行ってください
 - ツールチップの段落は「同じ色の行が続く」ことで判定しているため、まれに区切りがずれることがあります
 - 表示言語を切り替えても、すでにチャット欄にある行は切り替え前の言語のままです (バニラと同じ仕様)
 - 「mod の表示言語」を固定しても、操作設定画面 (キー割り当て) に出るキーの名前は Minecraft の言語のままです
@@ -150,6 +151,8 @@ cd chat-translator
 | `common/` | 全ローダー共通のコード・画面の文字列・辞書・単体テスト。バニラの Minecraft に対してコンパイルするので、ローダー固有の API を使うとここで失敗します |
 | `forge/` `neoforge/` `fabric/` | 各ローダーの入口 (イベントを `ChatTranslator` に渡すだけ) と mod 情報ファイル。common のソースを取り込んで 1 つの jar にします |
 | `gradle/loader.gradle` | 3 つのローダーで共通のビルド設定 (common の取り込み、ライブラリの同梱) |
+
+配布用の jar そのもの (開発用のクラスフォルダではなく、ライブラリ同梱済みの jar) で起動して確かめるには `./gradlew :neoforge:runProductionClient` / `./gradlew :fabric:runProductionClient` を使います (Forge は ForgeGradle に同じ仕組みが無いため未対応)。
 
 JDK 25 は Gradle (foojay) が自動で取得し、Gradle 自体もその JDK 25 で動きます (`gradle/gradle-daemon-jvm.properties`)。Gradle の起動自体には Java 17 以上が必要です。
 
