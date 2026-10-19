@@ -37,3 +37,6 @@ logs
 
 # local test server
 run-server
+
+# 動作確認の画像など (コミットしない)
+artifacts

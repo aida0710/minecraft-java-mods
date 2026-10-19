@@ -1,0 +1,4 @@
+classTweaker	v1	official
+# チャット欄の既存メッセージを訳文に差し替えるため (common の META-INF/accesstransformer.cfg と同じ内容)
+accessible	field	net/minecraft/client/gui/components/ChatComponent	allMessages	Ljava/util/List;
+accessible	method	net/minecraft/client/gui/components/ChatComponent	refreshTrimmedMessages	()V

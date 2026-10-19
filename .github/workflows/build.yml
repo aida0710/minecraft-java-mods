@@ -33,24 +33,31 @@ jobs:
 
       - name: Verify jar contents
         run: |
-          JAR=$(ls build/libs/chattranslator-*.jar | grep -v -- '-slim' | head -1)
-          echo "jar=$JAR"
-          unzip -l "$JAR" | grep -q 'com/aida0710/chattranslator/ChatTranslator.class'
-          unzip -l "$JAR" | grep -q 'com/aida0710/chattranslator/shadow/kotlin/Unit.class'
-          for f in META-INF/mods.toml META-INF/accesstransformer.cfg assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
-            unzip -l "$JAR" | grep -q "$f" || { echo "missing $f"; exit 1; }
+          for LOADER in forge neoforge fabric; do
+            JAR=$(ls $LOADER/build/libs/chattranslator-$LOADER-*.jar | grep -v -- '-slim' | head -1)
+            echo "jar=$JAR"
+            case $LOADER in
+              forge) METADATA="META-INF/mods.toml META-INF/accesstransformer.cfg" ;;
+              neoforge) METADATA="META-INF/neoforge.mods.toml META-INF/accesstransformer.cfg" ;;
+              fabric) METADATA="fabric.mod.json chattranslator.classtweaker" ;;
+            esac
+            LIST=$(unzip -l "$JAR")
+            for f in com/aida0710/chattranslator/ChatTranslator.class com/aida0710/chattranslator/shadow/kotlin/Unit.class com/aida0710/chattranslator/shadow/nightconfig/toml/TomlFormat.class $METADATA assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
+              grep -q " $f\$" <<<"$LIST" || { echo "missing $f in $JAR"; exit 1; }
+            done
+            if grep -E ' (kotlin|org/intellij|org/jetbrains|com/electronwill)/' <<<"$LIST"; then echo "unrelocated or unwanted classes found in $JAR"; exit 1; fi
           done
-          if unzip -l "$JAR" | grep -E ' (kotlin|org/intellij|org/jetbrains)/' ; then echo 'unrelocated or unwanted classes found'; exit 1; fi
+          unzip -p fabric/build/libs/chattranslator-fabric-*[0-9].jar fabric.mod.json | python3 -m json.tool > /dev/null
 
       - uses: actions/upload-artifact@v7
         with:
           name: chattranslator
           path: |
-            chat-translator/build/libs/*.jar
-            !chat-translator/build/libs/*-slim.jar
+            chat-translator/*/build/libs/chattranslator-*.jar
+            !chat-translator/*/build/libs/*-slim.jar
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/chat-translator-v')
         uses: softprops/action-gh-release@v3
         with:
-          files: chat-translator/build/libs/chattranslator-*[0-9].jar
+          files: chat-translator/*/build/libs/chattranslator-*[0-9].jar

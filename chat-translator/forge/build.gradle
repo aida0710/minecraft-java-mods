@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '[7.0.17,8)'
+    id 'org.jetbrains.kotlin.jvm'
+    id 'com.gradleup.shadow'
+}
+
+apply from: rootProject.file('gradle/loader.gradle')
+
+minecraft {
+    // common の META-INF/accesstransformer.cfg を適用する (既定の探し場所は forge 側のリソースだけなので明示する)
+    accessTransformers = files(rootProject.file('common/src/main/resources/META-INF/accesstransformer.cfg'))
+
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+        }
+        register('client') {
+            // ./gradlew :forge:runClient -Pselftest=<dir> -Pjoin=localhost:25565 で自動テスト用に起動する
+            if (project.hasProperty('selftest')) systemProperty 'chattranslator.selftest', project.property('selftest')
+            if (project.hasProperty('join')) args '--quickPlayMultiplayer', project.property('join')
+        }
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+}
+
+// ForgeGradle の開発実行 (merge-source-sets) は Java の出力ディレクトリしか結合しないため、
+// Kotlin のクラスも同じディレクトリへ出力する
+tasks.named('compileKotlin') {
+    destinationDirectory = sourceSets.main.java.destinationDirectory
+}
+
+// Kotlin のフルコンパイルは出力ディレクトリを空にするため、リソースのコピーはその後に行う
+// (先にコピーすると mods.toml や言語ファイルが消えた jar ができてしまう)
+tasks.named('processResources') {
+    mustRunAfter 'compileKotlin'
+}
