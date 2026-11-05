@@ -40,24 +40,31 @@ class ProvidersTest {
     private val openAiResponse = """{"choices":[{"message":{"role":"assistant","content":"<think>x</think>\n「こんにちは」\n"}}]}"""
     private val base = TranslatorConfig.current
 
-    @Test
-    fun builtinSendsRawTextWithLanguageCodes() = withServer("/v1/chat/completions", openAiResponse) { url, c ->
-        val p = BuiltinProvider({ "$url/v1" }, { true })
-        assertTrue(p.isReady(base))
-        assertEquals("こんにちは", p.translate("Hello", base.copy(sourceCode = "en", targetCode = "ko")))
-        assertEquals("Hello", c.body.getAsJsonArray("messages")[0].asJsonObject["content"].asString)
-        assertEquals("ko", c.body.getAsJsonObject("chat_template_kwargs")["target_lang_code"].asString)
-    }
+    private val completionResponse = """{"choices":[{"text":"こんにちは\n"}]}"""
 
     @Test
-    fun builtinTreatsAutoSourceAsEnglish() = withServer("/v1/chat/completions", openAiResponse) { url, c ->
-        BuiltinProvider({ "$url/v1" }, { true }).translate("Hello", base.copy(sourceCode = Languages.AUTO))
-        assertEquals("en", c.body.getAsJsonObject("chat_template_kwargs")["source_lang_code"].asString)
+    fun builtinSendsAssembledPromptToCompletionsApi() = withServer("/v1/completions", completionResponse) { url, c ->
+        val cfg = base.copy(builtinModel = BuiltinModel.PLAMO_2B, sourceCode = "en", targetCode = "ko")
+        val provider = BuiltinProvider({ "$url/v1" }, { true })
+        assertTrue(provider.isReady(cfg))
+        assertEquals("こんにちは", provider.translate("Hello", cfg))
+        assertEquals(BuiltinPrompts.build(ModelFamily.PLAMO_TRANSLATE, "Hello", "en", "ko").prompt, c.body["prompt"].asString)
+        assertEquals("<|plamo:tag|>", c.body.getAsJsonArray("stop")[0].asString)
+        assertEquals(InferenceServerRuntime.SERVED_MODEL_NAME, c.body["model"].asString)
     }
 
     @Test
     fun builtinIsNotReadyBeforeServerStarts() {
         assertFalse(BuiltinProvider({ null }, { false }).isReady(base))
+    }
+
+    @Test
+    fun builtinIsNotReadyWhenModelDoesNotSupportLanguage() {
+        T.setUiLanguage("en_us")
+        val cfg = base.copy(builtinModel = BuiltinModel.PLAMO_2B, sourceCode = "en", targetCode = "pt")
+        val provider = BuiltinProvider({ "http://127.0.0.1:1/v1" }, { true })
+        assertFalse(provider.isReady(cfg))
+        assertTrue(provider.notReadyReason(cfg).string.contains("Português"))
     }
 
     @Test

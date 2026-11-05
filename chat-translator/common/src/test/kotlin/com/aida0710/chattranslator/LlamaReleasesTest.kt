@@ -1,6 +1,7 @@
 package com.aida0710.chattranslator
 
 import com.sun.net.httpserver.HttpServer
+import net.minecraft.network.chat.Component
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
@@ -14,7 +15,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class LlamaReleasesTest {
-    private val serverExeName = if (LlamaServerManager.isWindows) "llama-server.exe" else "llama-server"
+    private val serverExeName = if (HostPlatform.current.os == HostPlatform.Os.WINDOWS) "llama-server.exe" else "llama-server"
+
+    private val ignoredProgress = object : InstallProgress {
+        override fun downloading(name: String, done: Long, total: Long) = Unit
+        override fun step(message: Component) = Unit
+    }
 
     /** この環境の CPU 版の配布ファイルに見せかけた、中身の違うアーカイブ */
     private fun fakeArchive(build: String): Pair<String, ByteArray> {
@@ -48,7 +54,7 @@ class LlamaReleasesTest {
         override fun close() = server.stop(0)
     }
 
-    private fun manager(dir: Path, releases: LlamaReleases) = LlamaServerManager(dir, releases) { _, _ -> }
+    private fun runtime(dir: Path, releases: LlamaReleases) = LlamaCppRuntime(dir, releases)
 
     private fun config(build: String) = TranslatorConfig.current.copy(llamaBuild = build, gpuBackend = GpuBackend.CPU)
 
@@ -73,7 +79,7 @@ class LlamaReleasesTest {
         val (asset, archive) = fakeArchive(build)
         FakeGitHub(build, asset, archive, apiBody = """{"assets":[{"name":"$asset","digest":"sha256:${sha256(archive)}"}]}""").use { github ->
             val dir = Files.createTempDirectory("llama")
-            val e = assertFailsWith<IllegalStateException> { manager(dir, github.releases).ensureBinary(config(build)) }
+            val e = assertFailsWith<IllegalStateException> { runtime(dir, github.releases).ensureBinary(config(build), ignoredProgress) }
             assertTrue(e.message!!.contains("SHA-256 mismatch"), e.message)
             assertEquals(0, github.apiCalls.get())
             assertEquals(1, github.downloads.get())
@@ -87,7 +93,7 @@ class LlamaReleasesTest {
         val (asset, archive) = fakeArchive(build)
         FakeGitHub(build, asset, archive, apiBody = """{"assets":[{"name":"$asset","digest":"sha256:${sha256(archive)}"}]}""").use { github ->
             val dir = Files.createTempDirectory("llama")
-            val exe = manager(dir, github.releases).ensureBinary(config(build))
+            val exe = runtime(dir, github.releases).ensureBinary(config(build), ignoredProgress)
             assertEquals(serverExeName, exe.name)
             assertEquals(1, github.apiCalls.get())
         }
@@ -99,7 +105,7 @@ class LlamaReleasesTest {
         val (asset, archive) = fakeArchive(build)
         FakeGitHub(build, asset, archive, apiBody = """{"assets":[{"name":"$asset","digest":null}]}""").use { github ->
             val dir = Files.createTempDirectory("llama")
-            assertFailsWith<IllegalStateException> { manager(dir, github.releases).ensureBinary(config(build)) }
+            assertFailsWith<IllegalStateException> { runtime(dir, github.releases).ensureBinary(config(build), ignoredProgress) }
             assertEquals(0, github.downloads.get())
             assertTrue(!hasServer(dir))
         }

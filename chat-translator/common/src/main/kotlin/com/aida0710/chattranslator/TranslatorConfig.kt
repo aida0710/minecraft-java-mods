@@ -28,8 +28,8 @@ object TranslatorConfig {
         // builtin
         val llamaBuild: String,
         val gpuBackend: GpuBackend,
-        val modelUrl: String,
-        val modelSha256: String,
+        val builtinModel: BuiltinModel,
+        val builtinFormat: ModelFormat,
         val builtinGpuLayers: Int,
         val builtinContextSize: Int,
         val builtinPort: Int,
@@ -66,13 +66,19 @@ object TranslatorConfig {
         val modelKey: String
             get() {
                 val model = when (provider) {
-                    ProviderType.BUILTIN -> modelUrl.substringAfterLast('/')
+                    ProviderType.BUILTIN -> builtinDistribution.cacheName
                     ProviderType.OPENAI_COMPATIBLE -> openaiModel
                     ProviderType.CLAUDE -> claudeModel
                     ProviderType.DEEPL, ProviderType.GOOGLE -> ""
                 }
                 return "$provider:$model:$sourceCode>$targetCode"
             }
+
+        val builtinDistribution: ModelDistribution get() = builtinModel.distribution(builtinFormat)
+
+        /** 内蔵 LLM のモデルが扱えない言語 (翻訳先を先に見る)。どちらも扱えるなら null */
+        fun unsupportedBuiltinLanguage(): String? =
+            listOf(targetCode, sourceCode).firstOrNull { !BuiltinPrompts.supportsLanguage(builtinModel.family, it) }
 
         /** 送信するチャットの翻訳用 (翻訳元・翻訳先を送信用の言語に入れ替える) */
         fun forSending(): Values = copy(sourceCode = sendSourceCode, targetCode = sendTargetCode)
@@ -86,7 +92,7 @@ object TranslatorConfig {
             .replace("{text}", text)
     }
 
-    /** TranslateGemma の公式プロンプト形式 (本文の前に空行2つ)。Ollama の translategemma で使う */
+    /** TranslateGemma の公式プロンプト形式 (本文の前に空行2つ)。内蔵 LLM と Ollama の translategemma で使う */
     const val TRANSLATEGEMMA_PROMPT =
         "You are a professional {source_lang} ({source_code}) to {target_lang} ({target_code}) translator. " +
             "Your goal is to accurately convey the meaning and nuances of the original {source_lang} text " +
@@ -94,8 +100,6 @@ object TranslatorConfig {
             "Produce only the {target_lang} translation, without any additional explanations or commentary. " +
             "Please translate the following {source_lang} text into {target_lang}:\\n\\n\\n{text}"
 
-    const val DEFAULT_MODEL_URL = "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf"
-    const val DEFAULT_MODEL_SHA256 = "81200d03e843d2ec1ece6eeafe7d13cb6e5211e1fcd336ade55790b683a08330"
     const val DEFAULT_LLM_CONTEXT =
         "The text comes from Minecraft multiplayer chat and item tooltips. Keep player names, numbers, and symbols unchanged, " +
             "and translate gaming slang naturally."
@@ -114,7 +118,7 @@ object TranslatorConfig {
 
     val minLength = IntSetting("filter.minLength", 3, 1..1000, "これより短い文は翻訳しない")
 
-    val sourceCode = StringSetting("language.source", "en", "翻訳元の言語コード (auto = 自動検出。内蔵 LLM では英語として扱う)")
+    val sourceCode = StringSetting("language.source", "en", "翻訳元の言語コード (auto = 自動検出。内蔵 LLM の TranslateGemma では英語として扱う)")
     val targetCode = StringSetting("language.target", "ja", "翻訳先の言語コード")
     val uiLanguage = StringSetting("language.ui", T.AUTO, "mod の画面の表示言語 (auto = Minecraft に合わせる / en_us / ja_jp / zh_cn)")
 
@@ -131,23 +135,34 @@ object TranslatorConfig {
     val llmContext = StringSetting("engine.llmContext", DEFAULT_LLM_CONTEXT, "LLM (Claude / OpenAI 互換) への追加の指示")
 
     val gpuBackend = EnumSetting(
-        "builtin.gpu", GpuBackend.VULKAN, GpuBackend.entries,
+        "builtin.gpu", GpuBackend.defaultFor(HostPlatform.current), GpuBackend.entries,
+        "形式が GGUF のときの GPU の使い方",
         "VULKAN: NVIDIA / AMD / Intel の GPU で動作 (ダウンロード約 30MB、おすすめ)",
         "CUDA:   NVIDIA 専用。CUDA 13 (ドライバ 580 以降)。約 580MB",
         "CUDA12: NVIDIA 専用。古いドライバ向け",
+        "METAL:  macOS の GPU (macOS で選べるのは METAL と CPU)",
         "CPU:    GPU を使わない (遅い)",
-        "※ macOS は設定に関わらず Metal 版を使う",
     )
-    val modelUrl = StringSetting("builtin.modelUrl", DEFAULT_MODEL_URL, "GGUF モデルのダウンロード URL")
-    val modelSha256 = StringSetting("builtin.modelSha256", DEFAULT_MODEL_SHA256, "モデルの SHA-256 (空なら検証しない)")
+    val builtinModel = EnumSetting(
+        "builtin.model", BuiltinModel.PLAMO_0_8B, BuiltinModel.entries,
+        "GEMMA_4B / GEMMA_12B:               TranslateGemma",
+        "PLAMO_0_8B / PLAMO_2B / PLAMO_8B:   PLaMo 3 Translate (Built with PLaMo)",
+    )
+    val builtinFormat = EnumSetting(
+        "builtin.format", ModelFormat.GGUF, ModelFormat.entries,
+        "GGUF:     llama.cpp で動かす。どの環境でも動く (おすすめ)",
+        "MLX_4BIT: mlx-lm で動かす。Apple silicon の macOS 専用",
+        "FP8:      vLLM で動かす。NVIDIA の RTX 40 シリーズ以降。Windows では WSL2 が必要",
+        "NVFP4:    vLLM で動かす。NVIDIA の RTX 50 シリーズ。Windows では WSL2 が必要",
+    )
     val llamaBuild = StringSetting(
         "builtin.llamaBuild", LlamaReleases.DEFAULT_BUILD,
-        "llama.cpp のリリースタグ (既定以外にすると、照合用の SHA-256 を GitHub API から取る。未認証のため同じ IP から 1 時間 60 回まで)",
+        "形式が GGUF のときの llama.cpp のリリースタグ (既定以外にすると、照合用の SHA-256 を GitHub API から取る。未認証のため同じ IP から 1 時間 60 回まで)",
     )
-    val gpuLayers = IntSetting("builtin.gpuLayers", 99, 0..999, "GPU に載せる層数 (99 = 全部)")
-    val contextSize = IntSetting("builtin.contextSize", 4096, 512..131072)
+    val gpuLayers = IntSetting("builtin.gpuLayers", 99, 0..999, "形式が GGUF のときに GPU に載せる層数 (99 = 全部)")
+    val contextSize = IntSetting("builtin.contextSize", 4096, 512..131072, "入力と出力を合わせた最大トークン数")
     val port = IntSetting("builtin.port", 0, 0..65535, "待ち受けポート (0 = 自動)")
-    val extraArgs = StringSetting("builtin.extraArgs", "", "llama-server に追加で渡す引数 (空白区切り)")
+    val extraArgs = StringSetting("builtin.extraArgs", "", "推論サーバー (llama-server / mlx-lm / vLLM) に追加で渡す引数 (空白区切り)")
 
     val openaiEndpoint = StringSetting(
         "openai.endpoint", "http://localhost:11434/v1",
@@ -212,7 +227,7 @@ object TranslatorConfig {
         minLength,
         sourceCode, targetCode, uiLanguage,
         provider, temperature, timeout, llmContext,
-        gpuBackend, modelUrl, modelSha256, llamaBuild, gpuLayers, contextSize, port, extraArgs,
+        builtinModel, builtinFormat, gpuBackend, llamaBuild, gpuLayers, contextSize, port, extraArgs,
         openaiEndpoint, openaiModel, openaiApiKey, openaiSystemPrompt, openaiUsePromptTemplate, openaiPromptTemplate, autoPull,
         claudeApiKey, claudeModel, deeplApiKey, googleApiKey,
         cachePersist, maxCache,
@@ -277,9 +292,10 @@ object TranslatorConfig {
             timeoutSeconds = v(timeout),
             llmContext = v(llmContext),
             llamaBuild = v(llamaBuild),
-            gpuBackend = v(gpuBackend),
-            modelUrl = v(modelUrl),
-            modelSha256 = v(modelSha256),
+            gpuBackend = v(gpuBackend).resolvedFor(HostPlatform.current),
+            builtinModel = v(builtinModel),
+            // 別の OS で書かれた設定ファイルを読んだときなど、この OS で動かない形式なら GGUF にする
+            builtinFormat = v(builtinFormat).takeIf { it.isAvailableOn(HostPlatform.current) } ?: ModelFormat.GGUF,
             builtinGpuLayers = v(gpuLayers),
             builtinContextSize = v(contextSize),
             builtinPort = v(port),

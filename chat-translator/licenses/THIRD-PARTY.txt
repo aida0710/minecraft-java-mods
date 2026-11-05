@@ -25,4 +25,10 @@ NightConfig core and toml ${night_config_version}
 Not bundled. Downloaded only when you press "Install" for the built-in LLM
 in the settings screen:
   llama.cpp (MIT License): https://github.com/ggml-org/llama.cpp
+  mlx-lm (MIT License): https://github.com/ml-explore/mlx-lm
+  vLLM (Apache License 2.0): https://github.com/vllm-project/vllm
+  uv (Apache License 2.0 / MIT License): https://github.com/astral-sh/uv
   TranslateGemma (Gemma Terms of Use): https://ai.google.dev/gemma/terms
+  PLaMo 3 Translate (PLaMo Community License): Built with PLaMo.
+    META-INF/licenses/PLaMo-Community-License-en.txt and
+    META-INF/licenses/PLaMo-Community-License-ja.txt in the jar

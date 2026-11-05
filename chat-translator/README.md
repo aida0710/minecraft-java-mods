@@ -8,7 +8,8 @@
   - Forge **66.0.x**
   - NeoForge **26.3.0.x**
   - Fabric (Fabric Loader 0.19.5 以降 + **Fabric API** が必要。[Mod Menu](https://modrinth.com/mod/modmenu) があれば mod 一覧から設定を開ける)
-- 翻訳エンジン: **内蔵 LLM** (llama.cpp + TranslateGemma、設定画面からインストール) / OpenAI 互換 API (Ollama・LM Studio・OpenAI・Gemini など) / Claude API / DeepL API / Google 翻訳 API
+- 翻訳エンジン: **内蔵 LLM** (TranslateGemma または PLaMo 3 Translate、設定画面からインストール) / OpenAI 互換 API (Ollama・LM Studio・OpenAI・Gemini など) / Claude API / DeepL API / Google 翻訳 API
+- 内蔵 LLM が動く OS: Windows / macOS (Apple silicon・Intel) / Linux
 - 翻訳の言語: 翻訳元・翻訳先を自由に選択 (日本語・英語・中国語・韓国語ほか約 30 言語、翻訳元は自動検出も可)
 - mod の画面表示: **日本語 / English / 简体中文** (既定は Minecraft の言語設定に合わせる。「一般」タブの「mod の表示言語」で固定も可)
 - 実装言語: Kotlin (標準ライブラリは jar に同梱済み。Kotlin for Forge や Fabric Language Kotlin は不要)
@@ -26,17 +27,46 @@
 2. `.minecraft/mods/` (Prism Launcher ならインスタンスの `mods/`) に配置して起動
 3. ワールドかサーバーに入り、`/chattranslator` (または mod 一覧の「設定」) で設定画面を開く (タブは「一般 / 送信 / 翻訳エンジン / 辞書 / キャッシュ / バックアップ」)
 4. 「翻訳エンジン」タブで使うエンジンを選ぶ
-   - **内蔵 LLM** (無料・オフライン): 「インストール」を押すと llama.cpp (Vulkan 版 約 30MB) と TranslateGemma 4B (約 2.5GB) をダウンロードします。どちらも SHA-256 で検証します
+   - **内蔵 LLM** (無料・オフライン): モデルと形式を選んで「インストール」を押すと、推論サーバーとモデルをダウンロードします。既定は llama.cpp (Vulkan 版 約 30MB) と PLaMo 3 Translate 0.8B (約 0.6GB) です。ダウンロードしたものは SHA-256 やコミットの固定で検証します ([内蔵 LLM のモデルと形式](#内蔵-llm-のモデルと形式))
    - **クラウド API**: API キーを貼り付けて「テスト翻訳」で確認
 
 内蔵 LLM はゲームの起動時には動かず、**ワールドやサーバーに入ったときに起動し、抜けると止まります**。ゲームが強制終了されても見張りプロセスが止めるので、VRAM を使ったままになりません。
+
+### 内蔵 LLM のモデルと形式
+
+「翻訳エンジン」タブの「モデル」と「形式」で選びます。迷ったら **形式は GGUF** のままで十分です。
+
+| モデル | GGUF の大きさ | メモ |
+| --- | --- | --- |
+| TranslateGemma 4B | 約 2.5GB | VRAM 4GB 程度 |
+| TranslateGemma 12B | 約 7.3GB | VRAM 8GB 以上推奨 |
+| PLaMo 3 Translate 0.8B | 約 0.6GB | 既定。いちばん軽い。CPU でも 1 文 0.2 秒ほど (Xeon 16 スレッド) |
+| PLaMo 3 Translate 2B | 約 1.8GB | 軽さと品質のバランスがよい |
+| PLaMo 3 Translate 8B | 約 5.3GB | VRAM 6GB 以上推奨 |
+
+PLaMo 3 Translate は翻訳元の自動検出に対応します (TranslateGemma は英語として扱います)。ポルトガル語・スウェーデン語・デンマーク語・フィンランド語・ノルウェー語・チェコ語・ルーマニア語・トルコ語・ウクライナ語・ギリシャ語には対応しないので、これらを使うときは TranslateGemma を選んでください。
+
+| 形式 | 推論サーバー | 動く環境 | 追加のダウンロード |
+| --- | --- | --- | --- |
+| GGUF (Q4_K_M) | llama.cpp | すべて。Windows・Linux は Vulkan / CUDA / CPU、macOS は Metal / CPU | 約 30MB〜 |
+| MLX 4bit | mlx-lm | Apple silicon の macOS | 約 0.5GB |
+| FP8 | vLLM | NVIDIA GPU の Linux と、Windows の WSL2 | 約 9.5GB |
+| NVFP4 | vLLM | RTX 50 シリーズの Linux と、Windows の WSL2 | 約 9.5GB |
+
+- **RTX 50 シリーズの Windows** でも、まずは GGUF をおすすめします。PLaMo 8B なら GGUF は 5.3GB、NVFP4 は 6.1GB で、PFN の評価でも精度に大きな差はありません。llama.cpp はそのまま Windows で動きますが、vLLM は Windows に対応していないため WSL2 が必要で、起動にも 1 分以上かかります
+- **FP8・NVFP4 を Windows で使う**には、先に WSL2 を入れておきます。PowerShell で `wsl --install` を実行して再起動すると Ubuntu が入り、NVIDIA のドライバーはそのまま WSL2 から使えます。Python 環境は WSL2 の中の `~/.local/share/chattranslator` に置き、「削除」でまとめて消します
+- FP8 は RTX 40 シリーズ以降で本来の速さになります。それより古い GPU では重みだけ FP8 のまま動きます。NVFP4 は RTX 50 シリーズ向けで、古い GPU では起動に失敗することがあります (RTX 3080 Ti では失敗しました)
+- TranslateGemma の MLX・FP8・NVFP4 は、Google ではなくコミュニティが変換したものです (mlx-community、kaitchup)。FP8・NVFP4 は変換者も簡単な確認しかしていないと書いています
+- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)
+- mlx-lm と vLLM は Python で動きます。Python を入れておく必要はありません (mod が [uv](https://github.com/astral-sh/uv) を取得して環境を作ります)。パッケージは jar に入れた一覧で版と SHA-256 を固定し、PLaMo の中で動く Python コードはコミットを固定して取得します
 
 ### 翻訳エンジンの比較
 
 | エンジン | 料金 | 速さ・品質 | メモ |
 | --- | --- | --- | --- |
-| 内蔵 LLM 4B | 無料 | 1 文 約 0.1 秒 (RTX 3080) | VRAM 4GB 程度。ゲーム用語の略語は誤訳しがち |
-| 内蔵 LLM 12B | 無料 | 4B より高品質 | VRAM 8GB 以上推奨・約 7.3GB |
+| 内蔵 LLM PLaMo 3 Translate | 無料 | 1 文 約 0.03〜0.05 秒 (0.8B、RTX 3080 Ti、CUDA)。PFN の評価では 2B で TranslateGemma の全サイズを上回る | 既定は 0.8B (約 0.6GB、VRAM も約 0.6GB)。一部の言語は未対応 |
+| 内蔵 LLM TranslateGemma 4B | 無料 | 1 文 約 0.1 秒 (RTX 3080) | VRAM 4GB 程度。ゲーム用語の略語は誤訳しがち |
+| 内蔵 LLM TranslateGemma 12B | 無料 | 4B より高品質 | VRAM 8GB 以上推奨・約 7.3GB |
 | Claude API (`claude-haiku-5-5`) | 従量課金 | 文脈やスラングに強い | `llmContext` でゲーム内の文だと伝えている |
 | DeepL / Google | 従量課金 (無料枠あり) | 速い | スラングは苦手 |
 | OpenAI 互換 | エンジン次第 | エンジン次第 | Ollama ならモデルが無いとき自動で `pull` |
@@ -146,7 +176,8 @@
 - 表示言語を切り替えても、すでにチャット欄にある行は切り替え前の言語のままです (バニラと同じ仕様)
 - 「mod の表示言語」を固定しても、操作設定画面 (キー割り当て) に出るキーの名前は Minecraft の言語のままです
 - Fabric では、署名付きのプレイヤー発言 (Hypixel 以外のサーバーの通常のチャット) を表示前に書き換える手段が無いため、いったん原文で表示してから同じ行を訳文に置き換えます。Hypixel のメッセージはシステムメッセージなので、ほかのローダーと同じく表示前に置き換わります
-- 4B モデルはゲーム内スラング (`f7` = フロア 7、`900m` = 9 億コイン など) を誤訳しがちです
+- TranslateGemma 4B はゲーム内スラング (`f7` = フロア 7、`900m` = 9 億コイン など) を誤訳しがちです
+- 内蔵 LLM の起動中は、ゲームと同じ GPU のメモリを使います。vLLM はモデルが動くだけの割合を確保しますが、VRAM に余裕が無いと起動に失敗します (理由は設定画面と `config/chattranslator/llama/server.log` に出ます)
 - 送信するチャットの翻訳を ON にした場合を除き、この mod はクライアント側の表示を変えるだけで、サーバーへ何かを送信することはありません。送信の翻訳も、自分が Enter を押した発言の中身を訳文に変えるだけです。Hypixel のルール (Allowed Modifications) に照らしての利用可否はご自身で判断してください
 
 ## ライセンス
@@ -156,7 +187,11 @@
 - Kotlin 標準ライブラリ: Apache License 2.0
 - NightConfig (設定ファイルの読み書き): GNU LGPL v3.0 ([licenses/LGPL-3.0.txt](licenses/LGPL-3.0.txt)。LGPL は [GPL v3.0](licenses/GPL-3.0.txt) に条件を足したもの)
 
-内蔵 LLM の llama.cpp (MIT License) と TranslateGemma (Gemma の利用規約) は jar に入っておらず、設定画面で「インストール」を押したときにダウンロードします。
+内蔵 LLM の推論サーバーとモデルは jar に入っておらず、設定画面で「インストール」を押したときにダウンロードします。
+
+- llama.cpp (MIT License)、mlx-lm (MIT License)、vLLM (Apache License 2.0)、uv (Apache License 2.0 / MIT License)
+- TranslateGemma: Gemma の利用規約
+- PLaMo 3 Translate: **Built with PLaMo**。PLaMo Community License ([日本語](licenses/PLaMo-Community-License-ja.txt) / [English](licenses/PLaMo-Community-License-en.txt))。個人の趣味などの利用は無償です。商用で使うときは[登録フォーム](https://forms.gle/mTL8tBLrMYXKNZD56)での事前登録が必要で、収入または売上が 10 億円を超える場合は別途契約が必要です。訳文を公表するときは PLaMo の生成物であることを明示する決まり (第 5 条) があるので、送信するチャットの翻訳で使うときは「訳文 (原文)」の形にするなど、ご自身で判断してください
 
 ## 開発
 
@@ -179,6 +214,30 @@ cd chat-translator
 | `common/` | 全ローダー共通のコード・画面の文字列・辞書・単体テスト。バニラの Minecraft に対してコンパイルするので、ローダー固有の API を使うとここで失敗します |
 | `forge/` `neoforge/` `fabric/` | 各ローダーの入口 (イベントを `ChatTranslator` に渡すだけ) と mod 情報ファイル。common のソースを取り込んで 1 つの jar にします |
 | `gradle/loader.gradle` | 3 つのローダーで共通のビルド設定 (common の取り込み、ライブラリの同梱) |
+
+### 内蔵 LLM の確認
+
+推論サーバーとモデルを実際にダウンロードして、インストール → 起動 → 翻訳 → 停止を通すテストがあります (既定では動きません)。
+
+```bash
+CHATTRANSLATOR_SMOKE_MODEL=PLAMO_0_8B CHATTRANSLATOR_SMOKE_FORMAT=GGUF CHATTRANSLATOR_SMOKE_GPU=CPU \
+  ./gradlew :common:test --tests '*BuiltinRuntimeSmokeTest*' --rerun -i
+```
+
+`.github/workflows/builtin-llm-smoke.yml` が同じテストを macOS・Windows・Linux で動かし、macOS ではゲームも起動します。GitHub の環境に NVIDIA の GPU は無いので、FP8・NVFP4 は GPU のあるマシンで上のコマンドを動かして確かめます。
+
+### Python の依存パッケージ
+
+`common/src/main/resources/assets/chattranslator/python/` の一覧は次のコマンドで作ります。版を上げたら、上のテストで動くことを確かめてください。
+
+```bash
+# mlx-requirements.txt (入力: mlx, mlx-lm, transformers, numba の版を固定した一覧)
+MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile --python-version 3.12 --python-platform aarch64-apple-darwin --generate-hashes --no-header --no-annotate <入力> -o mlx-requirements.txt
+# vllm-requirements.txt (入力: vllm, numba の版を固定した一覧)
+uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-header --no-annotate <入力> -o vllm-requirements.txt
+```
+
+モデルを足すときは `BuiltinModels.kt` の表に、Hugging Face の API (`/api/models/<リポジトリ>/tree/<コミット>?recursive=true`) から写したコミットと大きさを足します。
 
 配布用の jar そのもの (開発用のクラスフォルダではなく、ライブラリ同梱済みの jar) で起動して確かめるには `./gradlew :neoforge:runProductionClient` / `./gradlew :fabric:runProductionClient` を使います (Forge は ForgeGradle に同じ仕組みが無いため未対応)。
 

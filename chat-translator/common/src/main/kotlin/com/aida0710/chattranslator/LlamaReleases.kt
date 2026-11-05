@@ -60,14 +60,14 @@ class LlamaReleases(
             val arch = if (host.arm) "arm64" else "x64"
             return when (host.os) {
                 HostPlatform.Os.WINDOWS -> when (gpu) {
-                    GpuBackend.VULKAN -> listOf("llama-$build-bin-win-vulkan-$arch.zip")
+                    GpuBackend.VULKAN, GpuBackend.METAL -> listOf("llama-$build-bin-win-vulkan-$arch.zip")
                     GpuBackend.CPU -> listOf("llama-$build-bin-win-cpu-$arch.zip")
                     GpuBackend.CUDA -> listOf("llama-$build-bin-win-cuda-13.4-$arch.zip", "cudart-llama-bin-win-cuda-13.4-$arch.zip")
                     GpuBackend.CUDA12 -> listOf("llama-$build-bin-win-cuda-12.4-x64.zip", "cudart-llama-bin-win-cuda-12.4-x64.zip")
                 }
-                HostPlatform.Os.MAC -> listOf("llama-$build-bin-macos-$arch.tar.gz") // Metal 対応済み
+                HostPlatform.Os.MAC -> listOf("llama-$build-bin-macos-$arch.tar.gz") // GPU の設定に関わらず 1 種類 (arm64 は Metal 対応)
                 HostPlatform.Os.LINUX -> when (gpu) {
-                    GpuBackend.VULKAN -> listOf("llama-$build-bin-ubuntu-vulkan-$arch.tar.gz")
+                    GpuBackend.VULKAN, GpuBackend.METAL -> listOf("llama-$build-bin-ubuntu-vulkan-$arch.tar.gz")
                     GpuBackend.CPU -> listOf("llama-$build-bin-ubuntu-$arch.tar.gz")
                     GpuBackend.CUDA -> listOf("llama-$build-bin-ubuntu-cuda-13.4-$arch.tar.gz", "cudart-llama-$build-bin-ubuntu-cuda-13.4-$arch.tar.gz")
                     GpuBackend.CUDA12 -> listOf("llama-$build-bin-ubuntu-cuda-12.8-x64.tar.gz", "cudart-llama-$build-bin-ubuntu-cuda-12.8-x64.tar.gz")

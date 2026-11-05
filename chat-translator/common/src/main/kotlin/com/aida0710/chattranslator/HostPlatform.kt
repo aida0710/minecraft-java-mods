@@ -8,16 +8,26 @@ data class HostPlatform(val os: Os, val arm: Boolean) {
 
     companion object {
         val current: HostPlatform = run {
-            val os = System.getProperty("os.name").lowercase(Locale.ROOT)
+            val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
             val arch = System.getProperty("os.arch").lowercase(Locale.ROOT)
+            val os = when {
+                osName.contains("win") -> Os.WINDOWS
+                osName.contains("mac") -> Os.MAC
+                else -> Os.LINUX
+            }
             HostPlatform(
-                os = when {
-                    os.contains("win") -> Os.WINDOWS
-                    os.contains("mac") -> Os.MAC
-                    else -> Os.LINUX
-                },
-                arm = arch.contains("aarch64") || arch.contains("arm"),
+                os = os,
+                arm = arch.contains("aarch64") || arch.contains("arm") || (os == Os.MAC && isAppleSilicon()),
             )
         }
+
+        /**
+         * x64 版の Java を Rosetta で動かしていても os.arch は x86_64 になる。
+         * その場合も arm64 の llama-server は単体で動かせるので、Metal が使えない x64 版を選ばないよう CPU そのものを調べる。
+         */
+        private fun isAppleSilicon(): Boolean = runCatching {
+            val process = ProcessBuilder("sysctl", "-n", "hw.optional.arm64").redirectErrorStream(true).start()
+            process.inputStream.bufferedReader().use { it.readText().trim() == "1" }
+        }.getOrDefault(false)
     }
 }

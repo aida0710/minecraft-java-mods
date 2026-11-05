@@ -81,28 +81,34 @@ abstract class HttpProvider : TranslationProvider {
     }
 }
 
-/** 内蔵 llama-server。TranslateGemma のテンプレートに言語コードを渡すので本文だけ送る */
+/** 内蔵の推論サーバー。プロンプトは [BuiltinPrompts] が組み立てる */
 class BuiltinProvider(private val endpoint: () -> String?, private val installed: () -> Boolean) : HttpProvider() {
-    override fun isReady(cfg: TranslatorConfig.Values) = endpoint() != null
+    override fun isReady(cfg: TranslatorConfig.Values) = endpoint() != null && cfg.unsupportedBuiltinLanguage() == null
 
-    override fun notReadyReason(cfg: TranslatorConfig.Values) =
-        if (!installed()) T.tr("notready.builtin_not_installed")
-        else T.tr("notready.builtin_starting")
+    override fun notReadyReason(cfg: TranslatorConfig.Values): Component {
+        if (!installed()) return T.tr("notready.builtin_not_installed")
+        val unsupported = cfg.unsupportedBuiltinLanguage() ?: return T.tr("notready.builtin_starting")
+        return T.tr("notready.builtin_language", cfg.builtinModel.shortLabel, Languages.displayName(unsupported))
+    }
 
     override fun translate(text: String, cfg: TranslatorConfig.Values): String {
         val url = endpoint() ?: throw IllegalStateException("built-in server is not ready")
+        val prompt = BuiltinPrompts.build(cfg.builtinModel.family, text, cfg.sourceCode, cfg.targetCode)
         val body = JsonObject().apply {
-            addProperty("model", cfg.modelKey)
+            addProperty("model", InferenceServerRuntime.SERVED_MODEL_NAME)
+            addProperty("prompt", prompt.prompt)
             addProperty("temperature", cfg.temperature)
+            addProperty("max_tokens", MAX_OUTPUT_TOKENS)
             addProperty("stream", false)
-            add("messages", JsonArray().apply { add(message("user", text)) })
-            add("chat_template_kwargs", JsonObject().apply {
-                // TranslateGemma は自動検出に対応しないため英語として扱う
-                addProperty("source_lang_code", if (cfg.sourceCode == Languages.AUTO) "en" else cfg.sourceCode)
-                addProperty("target_lang_code", cfg.targetCode)
-            })
+            add("stop", JsonArray().apply { prompt.stop.forEach { add(it) } })
         }
-        return parseOpenAi(post("$url/chat/completions", body.toString(), cfg))
+        val response = post("$url/completions", body.toString(), cfg)
+        return clean(JsonParser.parseString(response).asJsonObject.getAsJsonArray("choices")[0].asJsonObject["text"].asString)
+    }
+
+    private companion object {
+        /** 本の 1 ページ (約 800 文字) の訳が収まる量。文脈の既定 4096 トークン (2 本で分けて 2048) の半分 */
+        const val MAX_OUTPUT_TOKENS = 1024
     }
 }
 

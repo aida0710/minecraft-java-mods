@@ -28,7 +28,7 @@ class GitHubReleaseApi(private val baseUrl: String = "https://api.github.com") {
         val res = http.send(
             HttpRequest.newBuilder(URI.create("$baseUrl/repos/$repository/releases/tags/$tag"))
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "ChatTranslator-Minecraft-Mod")
+                .header("User-Agent", Downloader.USER_AGENT)
                 .timeout(Duration.ofSeconds(20)).GET().build(),
             HttpResponse.BodyHandlers.ofString(),
         )

@@ -28,7 +28,8 @@ class LangFilesTest {
             ChatDisplayMode.entries.map { "settings.display.${it.name.lowercase()}" } +
             SendFormat.entries.map { "settings.send.format.${it.name.lowercase()}" } +
             Feature.entries.map { "toggle.${it.id}" } +
-            ModelPreset.entries.flatMap { listOf("model.${it.key}", "model.${it.key}.short") } +
+            BuiltinModel.entries.flatMap { listOf("model.${it.key}", "model.${it.key}.short") } +
+            ModelFormat.entries.flatMap { listOf("format.${it.key}", "format.${it.key}.detail") } +
             listOf("on", "off", "settings.uilang.auto")
         return (direct + conditional + dynamic).map { "chattranslator.$it" }.toSet()
     }

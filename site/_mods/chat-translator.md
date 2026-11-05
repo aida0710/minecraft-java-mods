@@ -2,7 +2,7 @@
 title: Chat Translator
 order: 1
 # 公開している最新の版。Release のタグ (chat-translator-v<版>) とダウンロードの行き先に使う
-version: "0.2.0"
+version: "0.3.0"
 icon: /assets/chat-translator/icon.svg
 # 一覧のカードの名前の色 (Minecraft のレアリティの色に合わせる)
 color: "#FF55FF"
@@ -88,10 +88,10 @@ features:
   - image: /assets/chat-translator/settings.jpg
     ja:
       title: エンジンと言語を選べる
-      text: 内蔵 LLM（無料・オフライン）、Claude、DeepL、Google、OpenAI 互換 API から選べます。翻訳できる言語は約 30。mod の画面は日本語・English・简体中文です。
+      text: 内蔵 LLM（無料・オフライン。TranslateGemma と PLaMo 3 Translate）、Claude、DeepL、Google、OpenAI 互換 API から選べます。翻訳できる言語は約 30。mod の画面は日本語・English・简体中文です。
     en:
       title: Your choice of engine and language
-      text: Use the built-in LLM (free and offline), Claude, DeepL, Google or any OpenAI-compatible API, with about 30 languages. The mod's own screens are in Japanese, English and Simplified Chinese.
+      text: Use the built-in LLM (free and offline, TranslateGemma or PLaMo 3 Translate), Claude, DeepL, Google or any OpenAI-compatible API, with about 30 languages. The mod's own screens are in Japanese, English and Simplified Chinese.
 ---
 <div data-lang="ja" markdown="1">
 
@@ -100,12 +100,13 @@ features:
 1. [ダウンロード](https://github.com/aida0710/minecraft-java-mods/releases)から、使うローダーの jar を取ります（Forge は `chattranslator-forge-…jar`、NeoForge は `chattranslator-neoforge-…jar`、Fabric は `chattranslator-fabric-…jar`）。Fabric では [Fabric API](https://modrinth.com/mod/fabric-api) も必要です
 2. jar を `.minecraft/mods/` に入れて起動します
 3. ワールドかサーバーに入り、`/chattranslator` で設定画面を開きます
-4. 「翻訳エンジン」タブでエンジンを選びます。内蔵 LLM なら「インストール」を押すだけです（約 2.5GB。ゲーム中だけ動きます）。クラウドのサービスなら API キーを貼り付けます
+4. 「翻訳エンジン」タブでエンジンを選びます。内蔵 LLM なら「インストール」を押すだけです（約 0.6GB。ゲーム中だけ動きます）。クラウドのサービスなら API キーを貼り付けます
 
 ## 翻訳エンジン
 
 | エンジン | 料金 | 向いていること |
 | --- | --- | --- |
+| 内蔵 LLM（PLaMo 3 Translate 0.8B / 2B / 8B） | 無料 | オフラインで使える。既定の 0.8B は約 0.6GB と軽い。一部の言語は未対応。Built with PLaMo |
 | 内蔵 LLM（TranslateGemma 4B） | 無料 | オフラインで使える。VRAM 4GB 程度 |
 | Claude API | 従量課金 | 文脈やスラングに強い |
 | DeepL / Google | 従量課金（無料枠あり） | 速い |
@@ -114,7 +115,8 @@ features:
 ## 知っておいてほしいこと
 
 - クラウドのエンジンを選ぶと、翻訳する文はそのサービスに送られます
-- 内蔵 LLM は、llama.cpp（GitHub）とモデル（Hugging Face）をダウンロードし、どちらも SHA-256 で照合してから使います
+- 内蔵 LLM は、推論サーバー（GitHub・PyPI）とモデル（Hugging Face）をダウンロードし、SHA-256 やコミットの固定で照合してから使います
+- 内蔵 LLM は Windows・macOS・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます。RTX 50 シリーズでの NVFP4 と、Mac の実機での動作はまだ確かめていません
 - 送信の翻訳は最初は OFF です。「送信」タブで ON にします
 - Hypixel とは関係のない、個人が作った mod です。サーバーのルールに合うかはご自身で確かめてください
 
@@ -128,12 +130,13 @@ features:
 1. Get the jar for your loader from [Downloads](https://github.com/aida0710/minecraft-java-mods/releases): `chattranslator-forge-…jar` for Forge, `chattranslator-neoforge-…jar` for NeoForge, or `chattranslator-fabric-…jar` for Fabric. Fabric also needs [Fabric API](https://modrinth.com/mod/fabric-api)
 2. Put the jar in `.minecraft/mods/` and start the game
 3. Join a world or a server and open the settings with `/chattranslator`
-4. Pick an engine on the "Engine" tab. For the built-in LLM, just press "Install" (about 2.5 GB; it only runs while you play). For a cloud service, paste your API key
+4. Pick an engine on the "Engine" tab. For the built-in LLM, just press "Install" (about 0.6 GB; it only runs while you play). For a cloud service, paste your API key
 
 ## Translation engines
 
 | Engine | Cost | Good for |
 | --- | --- | --- |
+| Built-in LLM (PLaMo 3 Translate 0.8B / 2B / 8B) | Free | Works offline. The default 0.8B is only about 0.6 GB. Some languages are not supported. Built with PLaMo |
 | Built-in LLM (TranslateGemma 4B) | Free | Works offline. Needs about 4 GB of VRAM |
 | Claude API | Pay as you go | Context and slang |
 | DeepL / Google | Pay as you go (free tier) | Speed |
@@ -142,7 +145,8 @@ features:
 ## Good to know
 
 - With a cloud engine, the text being translated is sent to that service
-- The built-in LLM downloads llama.cpp (GitHub) and a model (Hugging Face), and checks both with SHA-256 before use
+- The built-in LLM downloads an inference server (GitHub, PyPI) and a model (Hugging Face), and verifies them with SHA-256 or a pinned commit before use
+- The built-in LLM runs on Windows, macOS and Linux. Besides GGUF, you can choose MLX on Apple silicon, or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2). NVFP4 on RTX 50 series GPUs and real Macs have not been verified yet
 - Translating sent messages is off by default. Turn it on in the "Sending" tab
 - This is a personal project and is not affiliated with Hypixel. Check that it fits the rules of the server you play on
 
