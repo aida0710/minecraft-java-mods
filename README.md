@@ -17,7 +17,7 @@ Minecraft: Java Edition mods in Kotlin for Forge, NeoForge and Fabric.
 | --- | --- |
 | `<mod>/` (例: `chat-translator/`) | mod ごとの Gradle プロジェクト。使い方と開発の手順はそれぞれの README |
 | `site/` | 紹介サイト (GitHub Pages)。mod を足すときは `site/_mods/<mod>.md` を 1 つ足す ([site/README.md](site/README.md)) |
-| `.github/workflows/` | `build.yml`: push のたびに mod を組み立てて jar を検査する。`pages.yml`: `site/` が変わったら紹介サイトを公開する |
+| `.github/workflows/` | `build.yml`: push のたびに mod を組み立てて jar を検査する。`pages.yml`: `site/` が変わったら紹介サイトを公開する。`builtin-llm-smoke.yml`: Chat Translator の内蔵 LLM を macOS・Windows・Linux で動かして確かめる |
 
 mod を足すときは、新しいフォルダに Gradle プロジェクトを作り、`build.yml` に組み立ての手順を、`site/_mods/` に紹介ページを足します。
 
