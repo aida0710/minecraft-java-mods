@@ -57,7 +57,7 @@ PLaMo 3 Translate は翻訳元の自動検出に対応します (TranslateGemma 
 - **FP8・NVFP4 を Windows で使う**には、先に WSL2 を入れておきます。PowerShell で `wsl --install` を実行して再起動すると Ubuntu が入り、NVIDIA のドライバーはそのまま WSL2 から使えます。Python 環境は WSL2 の中の `~/.local/share/chattranslator` に置き、「削除」でまとめて消します
 - FP8 は RTX 40 シリーズ以降で本来の速さになります。それより古い GPU では重みだけ FP8 のまま動きます。NVFP4 は RTX 50 シリーズ向けで、古い GPU では起動に失敗することがあります (RTX 3080 Ti では失敗しました)
 - TranslateGemma の MLX・FP8・NVFP4 は、Google ではなくコミュニティが変換したものです (mlx-community、kaitchup)。FP8・NVFP4 は変換者も簡単な確認しかしていないと書いています
-- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)
+- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)、Intel の Mac のゲームの中での動作 (Intel の仮想環境ではゲーム本体が画面を作る前に異常終了しました。内蔵 LLM の翻訳はゲームの外のテストで確かめました)
 - mlx-lm と vLLM は Python で動きます。Python を入れておく必要はありません (mod が [uv](https://github.com/astral-sh/uv) を取得して環境を作ります)。パッケージは jar に入れた一覧で版と SHA-256 を固定し、PLaMo の中で動く Python コードはコミットを固定して取得します
 - macOS では、ダウンロードした llama-server・uv・Python 環境から隔離の印 (`com.apple.quarantine`) を外します。これらは公証されていないので、印が付いていると Gatekeeper に起動を止められるおそれがあるためです
 
