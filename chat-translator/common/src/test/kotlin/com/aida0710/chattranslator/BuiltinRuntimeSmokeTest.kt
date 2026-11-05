@@ -31,6 +31,10 @@ class BuiltinRuntimeSmokeTest {
             targetCode = "ja",
             timeoutSeconds = 600,
         )
+        // 設定画面に出ない組み合わせを試しても、利用者の環境の確認にならない
+        println("[smoke] host=${HostPlatform.current} format=${cfg.builtinFormat} gpu=${cfg.gpuBackend}")
+        assertTrue(cfg.builtinFormat.isAvailableOn(HostPlatform.current), "${cfg.builtinFormat} is not offered on ${HostPlatform.current}")
+        assertTrue(cfg.gpuBackend in GpuBackend.choicesFor(HostPlatform.current), "${cfg.gpuBackend} is not offered on ${HostPlatform.current}")
         val manager = BuiltinServerManager(
             baseDir,
             mapOf(

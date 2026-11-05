@@ -364,9 +364,10 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
                 server.refresh(cfg())
                 reopen(TAB_ENGINE)
             })
-            // GPU の選び方があるのは llama.cpp だけ。mlx-lm と vLLM は形式で決まる
-            if (c.builtinFormat.server == InferenceServer.LLAMA_CPP) {
-                rows.full(cycle(T.tr("settings.gpu"), GpuBackend.choicesFor(platform), c.gpuBackend, { Component.literal(it.name) }, FULL) {
+            // GPU の選び方があるのは llama.cpp だけ。mlx-lm と vLLM は形式で決まる。Intel の Mac は CPU しか無いので選ばせない
+            val gpuChoices = GpuBackend.choicesFor(platform)
+            if (c.builtinFormat.server == InferenceServer.LLAMA_CPP && gpuChoices.size > 1) {
+                rows.full(cycle(T.tr("settings.gpu"), gpuChoices, c.gpuBackend, { Component.literal(it.name) }, FULL) {
                     TranslatorConfig.update(TranslatorConfig.gpuBackend, it)
                     server.stop()
                     server.refresh(cfg())

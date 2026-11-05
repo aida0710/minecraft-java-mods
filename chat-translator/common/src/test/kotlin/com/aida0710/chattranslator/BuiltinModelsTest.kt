@@ -7,8 +7,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BuiltinModelsTest {
-    private val appleSilicon = HostPlatform(HostPlatform.Os.MAC, arm = true)
-    private val intelMac = HostPlatform(HostPlatform.Os.MAC, arm = false)
+    private val appleSilicon = HostPlatform(HostPlatform.Os.MAC, arm = true, macOsMajorVersion = 14)
+    private val intelMac = HostPlatform(HostPlatform.Os.MAC, arm = false, macOsMajorVersion = 14)
     private val windows = HostPlatform(HostPlatform.Os.WINDOWS, arm = false)
     private val linux = HostPlatform(HostPlatform.Os.LINUX, arm = false)
 
@@ -22,6 +22,25 @@ class BuiltinModelsTest {
     @Test
     fun appleSiliconCanChooseGgufOrMlx() {
         assertEquals(listOf(ModelFormat.GGUF, ModelFormat.MLX_4BIT), ModelFormat.availableOn(appleSilicon))
+    }
+
+    @Test
+    fun macOsBefore14OnlyHasGgufBecauseMlxHasNoPackageForIt() {
+        val macOs13 = appleSilicon.copy(macOsMajorVersion = 13)
+        assertEquals(listOf(ModelFormat.GGUF), ModelFormat.availableOn(macOs13))
+    }
+
+    @Test
+    fun unreadableMacOsVersionOnlyHasGguf() {
+        assertEquals(0, HostPlatform.majorVersionOf(""))
+        assertEquals(listOf(ModelFormat.GGUF), ModelFormat.availableOn(appleSilicon.copy(macOsMajorVersion = HostPlatform.majorVersionOf(""))))
+    }
+
+    @Test
+    fun readsMacOsMajorVersion() {
+        assertEquals(14, HostPlatform.majorVersionOf("14.8.9"))
+        assertEquals(26, HostPlatform.majorVersionOf("26.1"))
+        assertEquals(15, HostPlatform.majorVersionOf("15"))
     }
 
     @Test
@@ -47,11 +66,18 @@ class BuiltinModelsTest {
     }
 
     @Test
-    fun macOnlyOffersMetalAndCpu() {
+    fun appleSiliconOffersMetalAndCpu() {
         assertEquals(listOf(GpuBackend.METAL, GpuBackend.CPU), GpuBackend.choicesFor(appleSilicon))
         assertEquals(GpuBackend.METAL, GpuBackend.VULKAN.resolvedFor(appleSilicon))
         assertEquals(GpuBackend.VULKAN, GpuBackend.METAL.resolvedFor(windows))
         assertEquals(GpuBackend.CPU, GpuBackend.CPU.resolvedFor(appleSilicon))
+    }
+
+    @Test
+    fun intelMacOnlyOffersCpuBecauseItsLlamaCppHasNoMetal() {
+        assertEquals(listOf(GpuBackend.CPU), GpuBackend.choicesFor(intelMac))
+        assertEquals(GpuBackend.CPU, GpuBackend.METAL.resolvedFor(intelMac))
+        assertEquals(GpuBackend.CPU, GpuBackend.defaultFor(intelMac))
     }
 
     @Test

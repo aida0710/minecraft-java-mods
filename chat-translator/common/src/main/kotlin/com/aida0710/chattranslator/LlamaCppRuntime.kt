@@ -77,6 +77,7 @@ class LlamaCppRuntime(
             Downloader.extract(archive, dir)
             Files.deleteIfExists(archive)
         }
+        MacQuarantine.removeFrom(dir, platform)
         return findServer(dir) ?: throw IllegalStateException("llama-server not found in ${assets.first()}")
     }
 
