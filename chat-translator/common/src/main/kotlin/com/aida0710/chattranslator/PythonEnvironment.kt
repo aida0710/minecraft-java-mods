@@ -66,7 +66,7 @@ class PythonEnvironment(
         )
         // パッケージの本体は venv に入ったので、ダウンロードの控えは要らない
         runUv(CommandLine(listOf(uv, "cache", "clean"), environment = uvEnvironment), progress)
-        // uv が作った Python と共有ライブラリにも印が付くことがある
+        // uv が作った Python と共有ライブラリにも隔離属性が付くことがある
         MacQuarantine.removeFrom(baseDir.resolve("python"))
         Files.writeString(installedMarker, requirementsResource)
     }
