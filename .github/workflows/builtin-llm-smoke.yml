@@ -104,15 +104,12 @@ jobs:
           CHATTRANSLATOR_WSL_TEST: '1'
         run: ./gradlew :common:test --tests '*WslCommandHostIntegrationTest*' --rerun -i --console=plain 2>&1 | grep -E 'FAILED|PASSED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
 
-  # macOS の実機が手元に無いので、ゲームそのものも一度起動して設定画面を見る
+  # macOS の実機が手元に無いので、ゲームそのものも一度起動して設定画面を見る。
+  # GitHub の Intel の環境 (macos-15-intel) は、ゲーム本体が画面を作る前に異常終了するので入れていない
   macos-client:
-    name: macOS game client (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: macOS game client
+    runs-on: macos-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, macos-15-intel]
     defaults:
       run:
         working-directory: chat-translator
@@ -161,7 +158,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: macos-client-${{ matrix.os }}
+          name: macos-client
           path: |
             chat-translator/client.log
             chat-translator/fabric/run/screenshots
