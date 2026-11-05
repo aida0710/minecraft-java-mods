@@ -2,7 +2,7 @@
 title: Chat Translator
 order: 1
 # 公開している最新の版。Release のタグ (chat-translator-v<版>) とダウンロードの行き先に使う
-version: "0.2.0"
+version: "0.3.0"
 icon: /assets/chat-translator/icon.svg
 # 一覧のカードの名前の色 (Minecraft のレアリティの色に合わせる)
 color: "#FF55FF"
@@ -116,7 +116,7 @@ features:
 
 - クラウドのエンジンを選ぶと、翻訳する文はそのサービスに送られます
 - 内蔵 LLM は、推論サーバー（GitHub・PyPI）とモデル（Hugging Face）をダウンロードし、SHA-256 やコミットの固定で照合してから使います
-- 内蔵 LLM は Windows・macOS・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます
+- 内蔵 LLM は Windows・macOS・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます。RTX 50 シリーズでの NVFP4 と、Mac の実機での動作はまだ確かめていません
 - 送信の翻訳は最初は OFF です。「送信」タブで ON にします
 - Hypixel とは関係のない、個人が作った mod です。サーバーのルールに合うかはご自身で確かめてください
 
@@ -146,7 +146,7 @@ features:
 
 - With a cloud engine, the text being translated is sent to that service
 - The built-in LLM downloads an inference server (GitHub, PyPI) and a model (Hugging Face), and verifies them with SHA-256 or a pinned commit before use
-- The built-in LLM runs on Windows, macOS and Linux. Besides GGUF, you can choose MLX on Apple silicon, or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2)
+- The built-in LLM runs on Windows, macOS and Linux. Besides GGUF, you can choose MLX on Apple silicon, or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2). NVFP4 on RTX 50 series GPUs and real Macs have not been verified yet
 - Translating sent messages is off by default. Turn it on in the "Sending" tab
 - This is a personal project and is not affiliated with Hypixel. Check that it fits the rules of the server you play on
 

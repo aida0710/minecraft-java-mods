@@ -57,13 +57,14 @@ PLaMo 3 Translate は翻訳元の自動検出に対応します (TranslateGemma 
 - **FP8・NVFP4 を Windows で使う**には、先に WSL2 を入れておきます。PowerShell で `wsl --install` を実行して再起動すると Ubuntu が入り、NVIDIA のドライバーはそのまま WSL2 から使えます。Python 環境は WSL2 の中の `~/.local/share/chattranslator` に置き、「削除」でまとめて消します
 - FP8 は RTX 40 シリーズ以降で本来の速さになります。それより古い GPU では重みだけ FP8 のまま動きます。NVFP4 は RTX 50 シリーズ向けで、古い GPU では起動に失敗することがあります (RTX 3080 Ti では失敗しました)
 - TranslateGemma の MLX・FP8・NVFP4 は、Google ではなくコミュニティが変換したものです (mlx-community、kaitchup)。FP8・NVFP4 は変換者も簡単な確認しかしていないと書いています
+- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)
 - mlx-lm と vLLM は Python で動きます。Python を入れておく必要はありません (mod が [uv](https://github.com/astral-sh/uv) を取得して環境を作ります)。パッケージは jar に入れた一覧で版と SHA-256 を固定し、PLaMo の中で動く Python コードはコミットを固定して取得します
 
 ### 翻訳エンジンの比較
 
 | エンジン | 料金 | 速さ・品質 | メモ |
 | --- | --- | --- | --- |
-| 内蔵 LLM PLaMo 3 Translate | 無料 | PFN の評価では 2B で TranslateGemma の全サイズを上回る | 既定は 0.8B (約 0.6GB)。一部の言語は未対応 |
+| 内蔵 LLM PLaMo 3 Translate | 無料 | 1 文 約 0.03〜0.05 秒 (0.8B、RTX 3080 Ti、CUDA)。PFN の評価では 2B で TranslateGemma の全サイズを上回る | 既定は 0.8B (約 0.6GB、VRAM も約 0.6GB)。一部の言語は未対応 |
 | 内蔵 LLM TranslateGemma 4B | 無料 | 1 文 約 0.1 秒 (RTX 3080) | VRAM 4GB 程度。ゲーム用語の略語は誤訳しがち |
 | 内蔵 LLM TranslateGemma 12B | 無料 | 4B より高品質 | VRAM 8GB 以上推奨・約 7.3GB |
 | Claude API (`claude-haiku-5-5`) | 従量課金 | 文脈やスラングに強い | `llmContext` でゲーム内の文だと伝えている |
