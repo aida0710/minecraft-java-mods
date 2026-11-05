@@ -186,8 +186,8 @@ class Commands<S : Any>(private val sendMessage: (S, Component) -> Unit) {
                 when (c.provider) {
                     ProviderType.BUILTIN -> {
                         reply(ctx.source, T.tr("cmd.pull.restart"))
-                        mod.llama.stop()
-                        mod.llama.startAsync(c)
+                        mod.builtinServer.stop()
+                        mod.builtinServer.startAsync(c)
                     }
                     ProviderType.OPENAI_COMPATIBLE -> {
                         reply(ctx.source, T.tr("cmd.pull.ollama", c.openaiModel))

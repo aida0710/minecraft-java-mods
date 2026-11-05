@@ -32,23 +32,6 @@ import net.minecraft.network.chat.CommonComponents
 import net.minecraft.network.chat.Component
 import java.nio.file.Path
 
-/** 内蔵 LLM で選べるモデル */
-enum class ModelPreset(val key: String, val url: String, val sha256: String, val bytes: Long) {
-    GEMMA_4B("4b", TranslatorConfig.DEFAULT_MODEL_URL, TranslatorConfig.DEFAULT_MODEL_SHA256, 2_489_909_760),
-    GEMMA_12B(
-        "12b",
-        "https://huggingface.co/mradermacher/translategemma-12b-it-GGUF/resolve/main/translategemma-12b-it.Q4_K_M.gguf",
-        "b7aac4b4be7ab0c49b6556c29c4467e74313df7f1e95d9f9676bb2adf0afa528", 7_300_794_112,
-    ),
-    ;
-
-    val label get() = T.tr("model.$key")
-
-    companion object {
-        fun of(url: String) = entries.firstOrNull { it.url == url }
-    }
-}
-
 private fun gb(bytes: Long) = "%.1f".format(bytes / 1_000_000_000.0)
 
 /**
@@ -367,48 +350,68 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         }
 
         private fun builtin(rows: GridLayout.RowHelper, c: TranslatorConfig.Values) {
-            val llama = mod.llama
-            rows.addChild(cycle(T.tr("settings.model"), ModelPreset.entries, ModelPreset.of(c.modelUrl) ?: ModelPreset.GEMMA_4B, { T.tr("model.${it.key}.short") }) {
-                TranslatorConfig.update(TranslatorConfig.modelUrl, it.url)
-                TranslatorConfig.update(TranslatorConfig.modelSha256, it.sha256)
-                llama.stop()
-                llama.refresh(cfg())
-            }.also { it.setTooltip(Tooltip.create(ModelPreset.entries.map { p -> p.label }.reduce { a, b -> a.copy().append("\n").append(b) })) })
-            rows.addChild(cycle(T.tr("settings.gpu"), GpuBackend.entries, c.gpuBackend, { Component.literal(it.name) }) {
-                TranslatorConfig.update(TranslatorConfig.gpuBackend, it)
-                llama.stop()
-                llama.refresh(cfg())
-            }.also { it.setTooltip(Tooltip.create(T.tr("settings.gpu.tooltip"))) })
+            val server = mod.builtinServer
+            val platform = HostPlatform.current
+            rows.addChild(dropdown(T.tr("settings.model"), { BuiltinModel.entries }, c.builtinModel, { it.shortLabel }, menuName = { it.label }) {
+                TranslatorConfig.update(TranslatorConfig.builtinModel, it)
+                server.stop()
+                server.refresh(cfg())
+                reopen(TAB_ENGINE)
+            })
+            rows.addChild(dropdown(T.tr("settings.format"), { ModelFormat.availableOn(platform) }, c.builtinFormat, { it.label }, menuName = { T.tr("format.${it.key}.detail") }) {
+                TranslatorConfig.update(TranslatorConfig.builtinFormat, it)
+                server.stop()
+                server.refresh(cfg())
+                reopen(TAB_ENGINE)
+            })
+            // GPU の選び方があるのは llama.cpp だけ。mlx-lm と vLLM は形式で決まる
+            if (c.builtinFormat.server == InferenceServer.LLAMA_CPP) {
+                rows.full(cycle(T.tr("settings.gpu"), GpuBackend.choicesFor(platform), c.gpuBackend, { Component.literal(it.name) }, FULL) {
+                    TranslatorConfig.update(TranslatorConfig.gpuBackend, it)
+                    server.stop()
+                    server.refresh(cfg())
+                }.also { it.setTooltip(Tooltip.create(T.tr(if (platform.os == HostPlatform.Os.MAC) "settings.gpu.tooltip.mac" else "settings.gpu.tooltip"))) })
+            }
 
             val install = button(T.tr("settings.install", "?")) {
                 val cur = cfg()
-                when (llama.state) {
-                    LlamaServerManager.State.NOT_INSTALLED, LlamaServerManager.State.FAILED ->
-                        if (!llama.isInstalled(cur)) llama.installAsync(cur, startAfter = minecraft.player != null) else llama.startAsync(cur)
-                    LlamaServerManager.State.STOPPED -> llama.startAsync(cur)
-                    LlamaServerManager.State.READY -> { llama.stop(); llama.refresh(cur) }
+                when (server.state) {
+                    BuiltinServerManager.State.NOT_INSTALLED, BuiltinServerManager.State.FAILED ->
+                        if (!server.isInstalled(cur)) server.installAsync(cur, startAfter = minecraft.player != null) else server.startAsync(cur)
+                    BuiltinServerManager.State.STOPPED -> server.startAsync(cur)
+                    BuiltinServerManager.State.READY -> { server.stop(); server.refresh(cur) }
                     else -> {}
                 }
             }
-            val remove = button(T.tr("settings.uninstall", "0.0")) { llama.uninstall(cfg()) }
+            val remove = button(T.tr("settings.uninstall", "0.0")) { server.uninstall(cfg()) }
             refreshers += {
                 val cur = cfg()
-                val size = gb(ModelPreset.of(cur.modelUrl)?.bytes ?: 0L)
-                install.message = when (llama.state) {
-                    LlamaServerManager.State.NOT_INSTALLED -> T.tr("settings.install", size)
-                    LlamaServerManager.State.INSTALLING -> T.tr("status.installing", (llama.progressFraction * 100).toInt())
-                    LlamaServerManager.State.STOPPED -> T.tr("settings.start")
-                    LlamaServerManager.State.STARTING -> T.tr("status.starting")
-                    LlamaServerManager.State.READY -> T.tr("settings.stop")
-                    LlamaServerManager.State.FAILED -> T.tr(if (llama.isInstalled(cur)) "settings.restart" else "settings.reinstall")
+                val installed = server.isInstalled(cur)
+                install.message = when (server.state) {
+                    BuiltinServerManager.State.NOT_INSTALLED -> T.tr("settings.install", gb(cur.builtinDistribution.bytes + INSTALLED_SERVER_BYTES.getValue(cur.builtinFormat.server)))
+                    BuiltinServerManager.State.INSTALLING -> T.tr("status.installing", (server.progressFraction * 100).toInt())
+                    BuiltinServerManager.State.STOPPED -> T.tr("settings.start")
+                    BuiltinServerManager.State.STARTING -> T.tr("status.starting")
+                    BuiltinServerManager.State.READY -> T.tr("settings.stop")
+                    BuiltinServerManager.State.FAILED -> T.tr(if (installed) "settings.restart" else "settings.reinstall")
                 }
-                install.active = llama.state != LlamaServerManager.State.INSTALLING && llama.state != LlamaServerManager.State.STARTING
-                remove.active = llama.isInstalled(cur) && llama.state != LlamaServerManager.State.INSTALLING
-                remove.message = T.tr("settings.uninstall", gb(llama.installedBytes()))
+                install.active = server.state != BuiltinServerManager.State.INSTALLING && server.state != BuiltinServerManager.State.STARTING
+                remove.active = installed && server.state != BuiltinServerManager.State.INSTALLING
+                remove.message = T.tr("settings.uninstall", gb(server.installedBytes))
             }
             rows.addChild(install)
             rows.addChild(remove)
-            rows.full(label({ if (llama.state == LlamaServerManager.State.INSTALLING) llama.progressText else T.tr("settings.builtin.where") }))
+            rows.full(label({ if (server.state == BuiltinServerManager.State.INSTALLING) server.progressText else builtinNote(cfg()) }))
+        }
+
+        /** 選んでいるモデルについて、今いちばん知っておくべきこと */
+        private fun builtinNote(c: TranslatorConfig.Values): Component {
+            val unsupported = c.unsupportedBuiltinLanguage()
+            return when {
+                unsupported != null -> T.tr("notready.builtin_language", c.builtinModel.shortLabel, Languages.displayName(unsupported)).withStyle(ChatFormatting.RED)
+                c.builtinModel.family == ModelFamily.PLAMO_TRANSLATE -> T.tr("settings.builtin.built_with_plamo")
+                else -> T.tr("settings.builtin.where")
+            }
         }
 
         private fun test() {
@@ -520,6 +523,13 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         /** 開き直しても残すバックアップタブの状態 (含める項目と最後の結果) */
         private var backupSections = Backup.Sections()
         private var backupResult: Component? = null
+        /** インストールの見積もりに足す、推論サーバー本体の大きさ (Vulkan 版の llama.cpp、実測した Python 環境) */
+        val INSTALLED_SERVER_BYTES = mapOf(
+            InferenceServer.LLAMA_CPP to 30_000_000L,
+            InferenceServer.MLX_LM to 500_000_000L,
+            InferenceServer.VLLM to 9_500_000_000L,
+        )
+
         const val FULL = 310
         const val HALF = 150
 

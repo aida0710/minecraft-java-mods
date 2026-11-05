@@ -34,7 +34,16 @@ class ChatTranslator(configDir: Path) {
     val cache = TranslationCache(dataDir.resolve("cache.json"))
     val backup = Backup(dataDir.resolve("exports"), cache, dictionaries)
     val ollama = OllamaManager { message, progress -> queueNotice(message, progress) }
-    val llama = LlamaServerManager(dataDir.resolve("llama")) { message, progress -> queueNotice(message, progress) }
+    val builtinServer = dataDir.resolve("llama").let { baseDir ->
+        BuiltinServerManager(
+            baseDir,
+            mapOf(
+                InferenceServer.LLAMA_CPP to LlamaCppRuntime(baseDir),
+                InferenceServer.MLX_LM to MlxRuntime(baseDir),
+                InferenceServer.VLLM to VllmRuntime(baseDir),
+            ),
+        ) { message, progress -> queueNotice(message, progress) }
+    }
     lateinit var translator: Translator
         private set
     lateinit var chat: ChatHandler
@@ -70,7 +79,7 @@ class ChatTranslator(configDir: Path) {
         dictionaries.load()
         translator = Translator(
             mapOf(
-                ProviderType.BUILTIN to BuiltinProvider({ llama.endpoint }, { llama.isInstalled(TranslatorConfig.current) }),
+                ProviderType.BUILTIN to BuiltinProvider({ builtinServer.endpoint }, { builtinServer.isInstalled(TranslatorConfig.current) }),
                 ProviderType.OPENAI_COMPATIBLE to OpenAiCompatibleProvider(),
                 ProviderType.CLAUDE to ClaudeProvider(),
                 ProviderType.DEEPL to DeepLProvider(),
@@ -83,7 +92,7 @@ class ChatTranslator(configDir: Path) {
         LOGGER.info("Chat replace mode available: {}", chat.canReplace)
         tooltip = TooltipHandler(translator) { keys.showOriginal() }
         book = BookHandler(translator) { keys.showOriginal() }
-        llama.refresh(cfg)
+        builtinServer.refresh(cfg)
         TranslatorConfig.onChange(::onSettingsChanged)
         System.getProperty("chattranslator.selftest")?.let { dir ->
             selfTest = SelfTest(java.nio.file.Path.of(dir), chat) { translator.isReady() }
@@ -94,7 +103,7 @@ class ChatTranslator(configDir: Path) {
         saver.scheduleWithFixedDelay({ cache.saveIfDirty() }, 60, 60, TimeUnit.SECONDS)
         Runtime.getRuntime().addShutdownHook(Thread({
             translator.shutdown()
-            llama.stop()
+            builtinServer.stop()
         }, "ChatTranslator-shutdown"))
         LOGGER.info("ChatTranslator ready: provider={} model={} cache={} entries", cfg.provider, cfg.modelKey, cache.size())
     }
@@ -109,11 +118,11 @@ class ChatTranslator(configDir: Path) {
             cache.saveIfDirty()
         }
         dictionaries.apply()
-        llama.refresh(cfg)
+        builtinServer.refresh(cfg)
         if (lastProvider != null && lastProvider != cfg.provider) {
             // 内蔵 LLM 以外に切り替えたら VRAM を空ける
-            if (cfg.provider != ProviderType.BUILTIN) llama.stop()
-            else if (Minecraft.getInstance().player != null) llama.startAsync(cfg)
+            if (cfg.provider != ProviderType.BUILTIN) builtinServer.stop()
+            else if (Minecraft.getInstance().player != null) builtinServer.startAsync(cfg)
             notifiedNotReady = false
         }
         lastProvider = cfg.provider
@@ -140,11 +149,12 @@ class ChatTranslator(configDir: Path) {
         val cfg = TranslatorConfig.current
         lastProvider = cfg.provider
         when (cfg.provider) {
-            ProviderType.BUILTIN -> llama.startAsync(cfg)
+            ProviderType.BUILTIN -> builtinServer.startAsync(cfg)
             ProviderType.OPENAI_COMPATIBLE -> ollama.checkAsync(cfg)
             else -> {}
         }
-        val notReady = if (cfg.provider == ProviderType.BUILTIN) !llama.isInstalled(cfg) else !translator.isReady(cfg)
+        // 内蔵 LLM は起動を待つ間も準備中なので、起動を待っても解決しないものだけ案内する
+        val notReady = if (cfg.provider == ProviderType.BUILTIN) !builtinServer.isInstalled(cfg) || cfg.unsupportedBuiltinLanguage() != null else !translator.isReady(cfg)
         if (notReady && !notifiedNotReady) {
             notifiedNotReady = true
             queueNotice(translator.notReadyReason(cfg), false)
@@ -153,7 +163,7 @@ class ChatTranslator(configDir: Path) {
 
     fun onLoggedOut() {
         // 遊んでいない間は VRAM を使わない
-        if (ready()) llama.stop()
+        if (ready()) builtinServer.stop()
     }
 
     /** 任意のスレッドから呼べる。ワールド参加前ならログだけ残し、参加後にチャットへ出す */
@@ -208,13 +218,13 @@ class ChatTranslator(configDir: Path) {
 
     /** 状態表示用 */
     fun engineStatus(cfg: TranslatorConfig.Values = TranslatorConfig.current): Component = when (cfg.provider) {
-        ProviderType.BUILTIN -> when (llama.state) {
-            LlamaServerManager.State.NOT_INSTALLED -> T.tr("status.not_installed")
-            LlamaServerManager.State.INSTALLING -> T.tr("status.installing", (llama.progressFraction * 100).toInt())
-            LlamaServerManager.State.STOPPED -> T.tr("status.installed")
-            LlamaServerManager.State.STARTING -> T.tr("status.starting")
-            LlamaServerManager.State.READY -> T.tr("status.running")
-            LlamaServerManager.State.FAILED -> T.tr("status.error", llama.lastError ?: "?")
+        ProviderType.BUILTIN -> when (builtinServer.state) {
+            BuiltinServerManager.State.NOT_INSTALLED -> T.tr("status.not_installed")
+            BuiltinServerManager.State.INSTALLING -> T.tr("status.installing", (builtinServer.progressFraction * 100).toInt())
+            BuiltinServerManager.State.STOPPED -> T.tr("status.installed")
+            BuiltinServerManager.State.STARTING -> T.tr("status.starting")
+            BuiltinServerManager.State.READY -> T.tr("status.running")
+            BuiltinServerManager.State.FAILED -> T.tr("status.error", builtinServer.lastError ?: "?")
         }
         ProviderType.OPENAI_COMPATIBLE -> Component.literal("${cfg.openaiEndpoint} (${ollama.state})")
         else -> T.tr(if (translator.isReady(cfg)) "status.key_set" else "status.key_missing")

@@ -1,0 +1,153 @@
+# 内蔵 LLM の本物の推論サーバーとモデルをダウンロードして、インストール → 起動 → 翻訳 → 停止を各 OS で通す。
+# 手元に無い OS (macOS・Windows) の確認も兼ねる。GPU は無いので、vLLM は別の機材で確かめる (README の「内蔵 LLM の確認」)
+name: Built-in LLM smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/builtin-llm-smoke.yml
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Builtin*.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/CommandHost.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Downloader.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/HostPlatform.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/HuggingFaceHub.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/InferenceServerRuntime.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/LlamaCppRuntime.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/LlamaReleases.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Python*.kt
+      - chat-translator/common/src/main/resources/assets/chattranslator/python/**
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS GGUF PLaMo Metal, os: macos-latest, model: PLAMO_0_8B, format: GGUF, gpu: METAL }
+          - { name: macOS GGUF PLaMo CPU, os: macos-latest, model: PLAMO_0_8B, format: GGUF, gpu: CPU }
+          - { name: macOS GGUF Gemma CPU, os: macos-latest, model: GEMMA_4B, format: GGUF, gpu: CPU }
+          - { name: macOS MLX PLaMo, os: macos-latest, model: PLAMO_0_8B, format: MLX_4BIT, gpu: METAL }
+          - { name: macOS MLX Gemma, os: macos-latest, model: GEMMA_4B, format: MLX_4BIT, gpu: METAL }
+          - { name: Windows GGUF PLaMo CPU, os: windows-latest, model: PLAMO_0_8B, format: GGUF, gpu: CPU }
+          - { name: Linux GGUF Gemma CPU, os: ubuntu-latest, model: GEMMA_4B, format: GGUF, gpu: CPU }
+    defaults:
+      run:
+        shell: bash
+        working-directory: chat-translator
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - name: Install, start, translate and stop
+        env:
+          CHATTRANSLATOR_SMOKE_MODEL: ${{ matrix.model }}
+          CHATTRANSLATOR_SMOKE_FORMAT: ${{ matrix.format }}
+          CHATTRANSLATOR_SMOKE_GPU: ${{ matrix.gpu }}
+        run: ./gradlew :common:test --tests '*BuiltinRuntimeSmokeTest*' --rerun -i --console=plain 2>&1 | grep -E '\[smoke\]|\[notice\]|FAILED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
+      - name: Keep the server log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.name }}
+          path: |
+            chat-translator/common/build/test-results/test/*.xml
+            chat-translator/common/build/reports/tests/test
+          if-no-files-found: ignore
+
+  wsl:
+    name: Windows WSL command host
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: chat-translator
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - uses: Vampire/setup-wsl@v6
+        with:
+          distribution: Ubuntu-24.04
+          additional-packages: python3
+      - name: Run commands in WSL through the mod
+        shell: bash
+        env:
+          CHATTRANSLATOR_WSL_TEST: '1'
+        run: ./gradlew :common:test --tests '*WslCommandHostIntegrationTest*' --rerun -i --console=plain 2>&1 | grep -E 'FAILED|PASSED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
+
+  # macOS の実機が手元に無いので、ゲームそのものも一度起動して設定画面を見る
+  macos-client:
+    name: macOS game client
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: chat-translator
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - name: Start the game and open the settings
+        env:
+          SELFTEST_DIR: ${{ runner.temp }}/selftest
+        run: |
+          mkdir -p "$SELFTEST_DIR"
+          : > "$SELFTEST_DIR/commands.txt"
+          ./gradlew :fabric:runClient --console=plain -Pselftest="$SELFTEST_DIR" > client.log 2>&1 &
+          CLIENT=$!
+          send() { echo "$1" >> "$SELFTEST_DIR/commands.txt"; sleep "${2:-3}"; }
+          for _ in $(seq 1 600); do grep -q 'SELFTEST enabled' client.log && break; kill -0 $CLIENT 2>/dev/null || break; sleep 1; done
+          sleep 30
+          send "modlang ja_jp"
+          send "world selftest" 60
+          send "builtin PLAMO_0_8B MLX_4BIT"
+          send "settings 2" 5
+          send "config"
+          send "screenshot macos-mlx" 5
+          send "builtin PLAMO_0_8B GGUF"
+          send "settings 2" 5
+          send "screenshot macos-gguf" 5
+          send "widgets"
+          send "install" 5
+          for _ in $(seq 1 180); do grep -q 'SELFTEST\] ready' client.log && break; sleep 2; done
+          send "status"
+          send "close"
+          send "inject Steve: anyone want to do dungeons? we need a healer" 15
+          send "dump 6"
+          send "openchat"
+          send "screenshot macos-chat" 5
+          send "quit" 15
+          grep -E 'SELFTEST\]|ERROR' client.log | cut -c1-300 | tail -60
+          kill $CLIENT 2>/dev/null || true
+      - name: Keep the screenshots and log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-client
+          path: |
+            chat-translator/client.log
+            chat-translator/fabric/run/screenshots
+            chat-translator/fabric/run/logs/latest.log
+          if-no-files-found: ignore

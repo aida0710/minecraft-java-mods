@@ -114,7 +114,14 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             // 設定値を直接変える: "set provider CLAUDE" など (画面の操作を模擬)
             "lang" -> { val (s, t) = args[1].split(" "); TranslatorConfig.update(TranslatorConfig.sourceCode, s); TranslatorConfig.update(TranslatorConfig.targetCode, t) }
             "provider" -> TranslatorConfig.update(TranslatorConfig.provider, ProviderType.valueOf(args[1]))
-            "install" -> ChatTranslator.instance.llama.installAsync(TranslatorConfig.current, startAfter = true)
+            "install" -> ChatTranslator.instance.builtinServer.installAsync(TranslatorConfig.current, startAfter = true)
+            // 内蔵 LLM のモデルと形式を変える: "builtin PLAMO_0_8B GGUF"、GPU も変えるなら "builtin PLAMO_0_8B GGUF CPU"
+            "builtin" -> {
+                val parts = args[1].split(" ")
+                TranslatorConfig.update(TranslatorConfig.builtinModel, BuiltinModel.valueOf(parts[0]))
+                TranslatorConfig.update(TranslatorConfig.builtinFormat, ModelFormat.valueOf(parts[1]))
+                parts.getOrNull(2)?.let { TranslatorConfig.update(TranslatorConfig.gpuBackend, GpuBackend.valueOf(it)) }
+            }
             // Minecraft の表示言語を切り替える (mod の画面の多言語表示を確認する用)
             "uilang" -> { mc.languageManager.setSelected(args[1]); mc.options.languageCode = args[1]; mc.reloadResourcePacks() }
             // インベントリを開いた状態でショートカットキーを押したときの処理を呼ぶ (K = チャット翻訳 ON/OFF に割り当て)
@@ -153,7 +160,7 @@ class SelfTest(private val dir: Path, private val chat: ChatHandler, private val
             }
             // 送信チャットの翻訳で、訳文を入力欄に入れて確認するか ("sendconfirm false" ですぐ送る)
             "sendconfirm" -> TranslatorConfig.update(TranslatorConfig.sendConfirm, args[1].toBoolean())
-            "config" -> TranslatorConfig.current.let { log("source=${it.sourceCode} target=${it.targetCode} ui=${it.uiLanguage} provider=${it.provider} dicts=${it.enabledDictionaries}") }
+            "config" -> TranslatorConfig.current.let { log("source=${it.sourceCode} target=${it.targetCode} ui=${it.uiLanguage} provider=${it.provider} model=${it.builtinModel} format=${it.builtinFormat} gpu=${it.gpuBackend} dicts=${it.enabledDictionaries}") }
             "cache" -> log("cache size=${ChatTranslator.instance.cache.size()}")
             "cacheclear" -> ChatTranslator.instance.translator.clearCache()
             // キー設定画面 (この mod の見出しが登録できているかの確認用)

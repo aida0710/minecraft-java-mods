@@ -16,6 +16,8 @@ import java.util.zip.ZipInputStream
 
 /** HTTP ダウンロード (途中再開・進捗通知・SHA-256 検証) とアーカイブ展開 */
 object Downloader {
+    const val USER_AGENT = "ChatTranslator-Minecraft-Mod"
+
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(15))
         .followRedirects(HttpClient.Redirect.ALWAYS)
@@ -31,7 +33,7 @@ object Downloader {
         val existing = if (Files.exists(part)) Files.size(part) else 0L
 
         val request = HttpRequest.newBuilder(URI.create(url))
-            .header("User-Agent", "ChatTranslator-Minecraft-Mod")
+            .header("User-Agent", USER_AGENT)
             .apply { if (existing > 0) header("Range", "bytes=$existing-") }
             .GET().build()
         val res = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
