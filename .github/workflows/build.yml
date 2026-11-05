@@ -51,7 +51,7 @@ jobs:
               fabric) METADATA="fabric.mod.json chattranslator.classtweaker" ;;
             esac
             LIST=$(unzip -l "$JAR")
-            for f in com/aida0710/chattranslator/ChatTranslator.class com/aida0710/chattranslator/shadow/kotlin/Unit.class com/aida0710/chattranslator/shadow/nightconfig/toml/TomlFormat.class $METADATA assets/chattranslator/icon.png META-INF/LICENSE META-INF/licenses/THIRD-PARTY.txt META-INF/licenses/LGPL-3.0.txt META-INF/licenses/GPL-3.0.txt assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
+            for f in com/aida0710/chattranslator/ChatTranslator.class com/aida0710/chattranslator/shadow/kotlin/Unit.class com/aida0710/chattranslator/shadow/nightconfig/toml/TomlFormat.class $METADATA assets/chattranslator/icon.png META-INF/LICENSE META-INF/licenses/THIRD-PARTY.txt META-INF/licenses/LGPL-3.0.txt META-INF/licenses/GPL-3.0.txt META-INF/licenses/PLaMo-Community-License-en.txt META-INF/licenses/PLaMo-Community-License-ja.txt assets/chattranslator/python/mlx-requirements.txt assets/chattranslator/python/vllm-requirements.txt assets/chattranslator/lang/en_us.json assets/chattranslator/lang/ja_jp.json assets/chattranslator/lang/zh_cn.json assets/chattranslator/dictionaries/hypixel-skyblock.json; do
               grep -q " $f\$" <<<"$LIST" || { echo "missing $f in $JAR"; exit 1; }
             done
             if grep -E ' (kotlin|org/intellij|org/jetbrains|com/electronwill)/' <<<"$LIST"; then echo "unrelocated or unwanted classes found in $JAR"; exit 1; fi

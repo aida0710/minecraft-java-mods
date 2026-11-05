@@ -388,7 +388,7 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
                 val cur = cfg()
                 val installed = server.isInstalled(cur)
                 install.message = when (server.state) {
-                    BuiltinServerManager.State.NOT_INSTALLED -> T.tr("settings.install", gb(cur.builtinDistribution.bytes + INSTALLED_SERVER_BYTES.getValue(cur.builtinFormat.server)))
+                    BuiltinServerManager.State.NOT_INSTALLED -> T.tr("settings.install", gb(cur.builtinDistribution.bytes + cur.builtinFormat.server.installBytes))
                     BuiltinServerManager.State.INSTALLING -> T.tr("status.installing", (server.progressFraction * 100).toInt())
                     BuiltinServerManager.State.STOPPED -> T.tr("settings.start")
                     BuiltinServerManager.State.STARTING -> T.tr("status.starting")
@@ -396,7 +396,8 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
                     BuiltinServerManager.State.FAILED -> T.tr(if (installed) "settings.restart" else "settings.reinstall")
                 }
                 install.active = server.state != BuiltinServerManager.State.INSTALLING && server.state != BuiltinServerManager.State.STARTING
-                remove.active = installed && server.state != BuiltinServerManager.State.INSTALLING
+                // 「削除」は全モデルをまとめて消すので、今選んでいないモデルだけが入っていても押せるようにする
+                remove.active = server.installedBytes > 0 && server.state != BuiltinServerManager.State.INSTALLING
                 remove.message = T.tr("settings.uninstall", gb(server.installedBytes))
             }
             rows.addChild(install)
@@ -523,13 +524,6 @@ class SettingsScreen(private val parent: Screen?, private val initialTab: Int = 
         /** 開き直しても残すバックアップタブの状態 (含める項目と最後の結果) */
         private var backupSections = Backup.Sections()
         private var backupResult: Component? = null
-        /** インストールの見積もりに足す、推論サーバー本体の大きさ (Vulkan 版の llama.cpp、実測した Python 環境) */
-        val INSTALLED_SERVER_BYTES = mapOf(
-            InferenceServer.LLAMA_CPP to 30_000_000L,
-            InferenceServer.MLX_LM to 500_000_000L,
-            InferenceServer.VLLM to 9_500_000_000L,
-        )
-
         const val FULL = 310
         const val HALF = 150
 

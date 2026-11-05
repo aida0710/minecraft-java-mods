@@ -2,8 +2,8 @@ package com.aida0710.chattranslator
 
 import java.nio.file.Path
 import java.time.Duration
+import java.util.Locale
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.exists
 
 /** Python で動く推論サーバーの共通部分: Python 環境とモデルのフォルダをそろえる */
 abstract class PythonServerRuntime(
@@ -77,7 +77,7 @@ class VllmRuntime(
             addAll(listOf("--host", "127.0.0.1", "--port", port.toString()))
             addAll(listOf("--served-model-name", InferenceServerRuntime.SERVED_MODEL_NAME))
             addAll(listOf("--max-model-len", cfg.builtinContextSize.toString(), "--max-num-seqs", "2"))
-            addAll(listOf("--gpu-memory-utilization", "%.3f".format(java.util.Locale.ROOT, utilization)))
+            addAll(listOf("--gpu-memory-utilization", "%.3f".format(Locale.ROOT, utilization)))
             // PLaMo のトークナイザーはリポジトリ同梱のコード。コミットを固定して取得している
             if (cfg.builtinModel.family == ModelFamily.PLAMO_TRANSLATE) add("--trust-remote-code")
         }

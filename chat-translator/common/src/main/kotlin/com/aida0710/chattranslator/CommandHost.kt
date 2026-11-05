@@ -106,7 +106,7 @@ class LocalCommandHost(private val host: HostPlatform = HostPlatform.current) : 
  */
 class WslCommandHost : CommandHost {
     override fun pathOf(path: Path): String {
-        val converter = ProcessBuilder(WSL, "--exec", "wslpath", "-a", path.toAbsolutePath().toString()).redirectErrorStream(true).start()
+        val converter = wsl("--exec", "wslpath", "-a", path.toAbsolutePath().toString()).redirectErrorStream(true).start()
         val output = converter.inputStream.bufferedReader().use { it.readText().trim() }
         check(converter.waitFor() == 0) { "wslpath failed: $output" }
         return output
@@ -115,22 +115,31 @@ class WslCommandHost : CommandHost {
     override fun environmentRoot(baseDir: Path): String = linuxHome() + "/" + ENVIRONMENT_DIRECTORY
 
     private fun linuxHome(): String {
-        val shell = ProcessBuilder(WSL, "--exec", "sh", "-c", "printf %s \"\$HOME\"").redirectErrorStream(true).start()
+        val shell = wsl("--exec", "sh", "-c", "printf %s \$HOME").redirectErrorStream(true).start()
         val output = shell.inputStream.bufferedReader().use { it.readText().trim() }
         check(shell.waitFor() == 0 && output.startsWith("/")) { "Could not read HOME in WSL: $output" }
         return output
     }
 
-    override fun processBuilder(command: CommandLine): ProcessBuilder = ProcessBuilder(wslArguments(command, command.arguments))
+    override fun processBuilder(command: CommandLine): ProcessBuilder = wsl(*wslArguments(command, command.arguments).toTypedArray())
 
     override fun startServer(command: CommandLine, log: Path): Process {
         // sh が pid を書いてから exec するので、書いた pid はサーバーそのものになる
-        val withPidFile = listOf("sh", "-c", "echo \$\$ > $LINUX_PID_FILE; exec \"\$@\"", "sh") + command.arguments
-        return ProcessBuilder(wslArguments(command, withPidFile)).redirectErrorStream(true).redirectOutput(log.toFile()).start()
+        val script = "echo \$\$ > $LINUX_PID_FILE; exec " + command.arguments.joinToString(" ") { singleQuoted(it) }
+        val withPidFile = listOf("sh", "-c", script)
+        return wsl(*wslArguments(command, withPidFile).toTypedArray()).redirectErrorStream(true).redirectOutput(log.toFile()).start()
     }
 
+    /**
+     * sh に渡す文字列の引用。Windows のコマンドラインを通すと二重引用符が消えるので、単一引用符だけを使う
+     * (モデルのパスには C:\Users\Taro Yamada のように空白が入ることがある)
+     */
+    private fun singleQuoted(argument: String) = "'" + argument.replace("'", "'\\''") + "'"
+
+    /** wsl.exe 自身のメッセージは既定で UTF-16 なので、画面に出せるよう UTF-8 にする */
+    private fun wsl(vararg arguments: String) = ProcessBuilder(WSL, *arguments).apply { environment()["WSL_UTF8"] = "1" }
+
     private fun wslArguments(command: CommandLine, arguments: List<String>): List<String> = buildList {
-        add(WSL)
         command.workingDirectory?.let { add("--cd"); add(it) }
         add("--exec")
         if (command.environment.isNotEmpty()) {
@@ -153,12 +162,12 @@ class WslCommandHost : CommandHost {
     override fun stopLeftoverServer(baseDir: Path, pidFile: Path) = killServerInLinux()
 
     private fun killServerInLinux() {
-        runCatching { ProcessBuilder(WSL, "--exec", "sh", "-c", KILL_SERVER_SCRIPT).redirectErrorStream(true).start().waitFor(STOP_WAIT_SECONDS, TimeUnit.SECONDS) }
+        runCatching { wsl("--exec", "sh", "-c", KILL_SERVER_SCRIPT).redirectErrorStream(true).start().waitFor(STOP_WAIT_SECONDS, TimeUnit.SECONDS) }
     }
 
     override fun removeEnvironment(baseDir: Path) {
-        val script = "rm -rf \"\$HOME/$ENVIRONMENT_DIRECTORY\""
-        runCatching { ProcessBuilder(WSL, "--exec", "sh", "-c", script).redirectErrorStream(true).start().waitFor() }
+        val script = "rm -rf \$HOME/$ENVIRONMENT_DIRECTORY"
+        runCatching { wsl("--exec", "sh", "-c", script).redirectErrorStream(true).start().waitFor() }
     }
 
     private companion object {

@@ -3,11 +3,14 @@ package com.aida0710.chattranslator
 /** プロンプトの形式と対応言語が同じモデルのまとまり */
 enum class ModelFamily { TRANSLATE_GEMMA, PLAMO_TRANSLATE }
 
-/** モデルを動かす推論サーバー */
-enum class InferenceServer(val displayName: String) {
-    LLAMA_CPP("llama.cpp"),
-    MLX_LM("mlx-lm"),
-    VLLM("vLLM"),
+/**
+ * モデルを動かす推論サーバー。
+ * @param installBytes サーバー本体の大きさの目安。インストールの見積もりに足す (Vulkan 版の llama.cpp、実測した Python 環境)
+ */
+enum class InferenceServer(val displayName: String, val installBytes: Long) {
+    LLAMA_CPP("llama.cpp", 30_000_000),
+    MLX_LM("mlx-lm", 500_000_000),
+    VLLM("vLLM", 9_500_000_000),
 }
 
 /** モデルの配布形式。形式を選ぶと推論サーバーも決まる */

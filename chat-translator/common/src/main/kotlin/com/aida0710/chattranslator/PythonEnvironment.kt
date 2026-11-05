@@ -2,6 +2,8 @@ package com.aida0710.chattranslator
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import kotlin.io.path.exists
 import kotlin.io.path.name
 
@@ -42,9 +44,9 @@ class PythonEnvironment(
     fun isInstalled(): Boolean = installedMarker.exists()
 
     /** venv の中の実行ファイルの、実行先から見たパス */
-    fun executable(name: String): String = "${environmentDirectory()}/venv/bin/$name"
+    fun executable(executableName: String): String = "${environmentDirectory()}/venv/bin/$executableName"
 
-    private fun environmentDirectory() = "${host.environmentRoot(baseDir)}/${this.name}"
+    private fun environmentDirectory() = "${host.environmentRoot(baseDir)}/$name"
 
     fun install(progress: InstallProgress) {
         if (isInstalled()) return
@@ -82,7 +84,7 @@ class PythonEnvironment(
     private fun copyRequirementsToDisk(): Path {
         val target = baseDir.resolve("python").resolve(requirementsResource.substringAfterLast('/'))
         val stream = javaClass.getResourceAsStream(requirementsResource) ?: error("missing $requirementsResource")
-        stream.use { Files.copy(it, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+        stream.use { Files.copy(it, target, StandardCopyOption.REPLACE_EXISTING) }
         return target
     }
 
@@ -91,7 +93,7 @@ class PythonEnvironment(
         Files.createDirectories(installLog.parent)
         val uv = host.processBuilder(command).redirectErrorStream(true).start()
         val lines = ArrayDeque<String>()
-        Files.newBufferedWriter(installLog, Charsets.UTF_8, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND).use { log ->
+        Files.newBufferedWriter(installLog, Charsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND).use { log ->
             uv.inputStream.bufferedReader().forEachLine { line ->
                 log.appendLine(line)
                 log.flush()

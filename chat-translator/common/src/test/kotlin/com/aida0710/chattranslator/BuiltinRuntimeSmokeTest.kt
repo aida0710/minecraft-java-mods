@@ -5,7 +5,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -15,6 +14,7 @@ import kotlin.test.assertTrue
  *   CHATTRANSLATOR_SMOKE_FORMAT [ModelFormat] の名前 (既定は GGUF)
  *   CHATTRANSLATOR_SMOKE_GPU    [GpuBackend] の名前 (既定はこの OS の既定)
  *   CHATTRANSLATOR_SMOKE_DIR    インストール先 (既定は一時フォルダ)
+ *   CHATTRANSLATOR_SMOKE_EXTRA_ARGS 推論サーバーに追加で渡す引数
  */
 class BuiltinRuntimeSmokeTest {
     @Test
@@ -68,7 +68,6 @@ class BuiltinRuntimeSmokeTest {
         } finally {
             manager.stop()
         }
-        assertNotNull(manager)
         assertEquals(null, manager.endpoint)
     }
 

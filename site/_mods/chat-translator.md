@@ -88,10 +88,10 @@ features:
   - image: /assets/chat-translator/settings.jpg
     ja:
       title: エンジンと言語を選べる
-      text: 内蔵 LLM（無料・オフライン）、Claude、DeepL、Google、OpenAI 互換 API から選べます。翻訳できる言語は約 30。mod の画面は日本語・English・简体中文です。
+      text: 内蔵 LLM（無料・オフライン。TranslateGemma と PLaMo 3 Translate）、Claude、DeepL、Google、OpenAI 互換 API から選べます。翻訳できる言語は約 30。mod の画面は日本語・English・简体中文です。
     en:
       title: Your choice of engine and language
-      text: Use the built-in LLM (free and offline), Claude, DeepL, Google or any OpenAI-compatible API, with about 30 languages. The mod's own screens are in Japanese, English and Simplified Chinese.
+      text: Use the built-in LLM (free and offline, TranslateGemma or PLaMo 3 Translate), Claude, DeepL, Google or any OpenAI-compatible API, with about 30 languages. The mod's own screens are in Japanese, English and Simplified Chinese.
 ---
 <div data-lang="ja" markdown="1">
 
@@ -107,6 +107,7 @@ features:
 | エンジン | 料金 | 向いていること |
 | --- | --- | --- |
 | 内蔵 LLM（TranslateGemma 4B） | 無料 | オフラインで使える。VRAM 4GB 程度 |
+| 内蔵 LLM（PLaMo 3 Translate 0.8B / 2B / 8B） | 無料 | オフラインで使える。0.8B は約 0.6GB と軽い。一部の言語は未対応。Built with PLaMo |
 | Claude API | 従量課金 | 文脈やスラングに強い |
 | DeepL / Google | 従量課金（無料枠あり） | 速い |
 | OpenAI 互換（Ollama・LM Studio など） | エンジンによる | 手元の LLM を使える |
@@ -114,7 +115,8 @@ features:
 ## 知っておいてほしいこと
 
 - クラウドのエンジンを選ぶと、翻訳する文はそのサービスに送られます
-- 内蔵 LLM は、llama.cpp（GitHub）とモデル（Hugging Face）をダウンロードし、どちらも SHA-256 で照合してから使います
+- 内蔵 LLM は、推論サーバー（GitHub・PyPI）とモデル（Hugging Face）をダウンロードし、SHA-256 やコミットの固定で照合してから使います
+- 内蔵 LLM は Windows・macOS・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます
 - 送信の翻訳は最初は OFF です。「送信」タブで ON にします
 - Hypixel とは関係のない、個人が作った mod です。サーバーのルールに合うかはご自身で確かめてください
 
@@ -135,6 +137,7 @@ features:
 | Engine | Cost | Good for |
 | --- | --- | --- |
 | Built-in LLM (TranslateGemma 4B) | Free | Works offline. Needs about 4 GB of VRAM |
+| Built-in LLM (PLaMo 3 Translate 0.8B / 2B / 8B) | Free | Works offline. 0.8B is only about 0.6 GB. Some languages are not supported. Built with PLaMo |
 | Claude API | Pay as you go | Context and slang |
 | DeepL / Google | Pay as you go (free tier) | Speed |
 | OpenAI-compatible (Ollama, LM Studio, …) | Depends on the engine | Using an LLM you already run |
@@ -142,7 +145,8 @@ features:
 ## Good to know
 
 - With a cloud engine, the text being translated is sent to that service
-- The built-in LLM downloads llama.cpp (GitHub) and a model (Hugging Face), and checks both with SHA-256 before use
+- The built-in LLM downloads an inference server (GitHub, PyPI) and a model (Hugging Face), and verifies them with SHA-256 or a pinned commit before use
+- The built-in LLM runs on Windows, macOS and Linux. Besides GGUF, you can choose MLX on Apple silicon, or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2)
 - Translating sent messages is off by default. Turn it on in the "Sending" tab
 - This is a personal project and is not affiliated with Hypixel. Check that it fits the rules of the server you play on
 

@@ -59,7 +59,7 @@ class CommandHostTest {
         }
 
         val copiedSleep = baseDir.resolve("sleep")
-        Files.copy(java.nio.file.Path.of(ProcessHandle.of(ProcessBuilder("sleep", "1").start().pid()).flatMap { it.info().command() }.orElse("/bin/sleep")), copiedSleep)
+        Files.copy(java.nio.file.Path.of("/bin/sleep"), copiedSleep)
         copiedSleep.toFile().setExecutable(true)
         val leftover = ProcessBuilder(copiedSleep.toString(), "60").start()
         Files.writeString(pidFile, leftover.pid().toString())

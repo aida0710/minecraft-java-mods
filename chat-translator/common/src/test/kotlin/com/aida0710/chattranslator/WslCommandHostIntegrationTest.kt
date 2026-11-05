@@ -1,5 +1,6 @@
 package com.aida0710.chattranslator
 
+import net.minecraft.network.chat.Component
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.net.URI
 import java.net.http.HttpClient
@@ -9,6 +10,7 @@ import java.nio.file.Files
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -17,6 +19,10 @@ import kotlin.test.assertTrue
  * GPU はいらない。空白を含むパス・環境変数・サーバーの起動と停止が Windows と Linux の境目を越えて届くかを見る。
  */
 class WslCommandHostIntegrationTest {
+    init {
+        T.setUiLanguage("en_us")
+    }
+
     private val host = WslCommandHost()
 
     private fun assumeWsl() = assumeTrue(System.getenv("CHATTRANSLATOR_WSL_TEST") != null, "CHATTRANSLATOR_WSL_TEST is not set")
@@ -42,7 +48,7 @@ class WslCommandHostIntegrationTest {
     @Test
     fun environmentReachesLinuxCommand() {
         assumeWsl()
-        assertEquals("a b", output(CommandLine(listOf("sh", "-c", "printf %s \"\$UV_TEST\""), environment = mapOf("UV_TEST" to "a b"))))
+        assertEquals("a b", output(CommandLine(listOf("printenv", "UV_TEST"), environment = mapOf("UV_TEST" to "a b"))))
     }
 
     @Test
@@ -54,13 +60,51 @@ class WslCommandHostIntegrationTest {
     }
 
     @Test
-    fun serverStartedInLinuxAnswersOnWindowsLocalhostAndStops() {
+    fun pythonEnvironmentIsBuiltInLinuxHomeAndRemoved() {
         assumeWsl()
+        val baseDir = Files.createTempDirectory("chat translator env")
+        val environment = PythonEnvironment(host, baseDir, "wsl-test", UvRelease.LINUX_X64, "/python/test-requirements.txt")
+        val ignoredProgress = object : InstallProgress {
+            override fun downloading(name: String, done: Long, total: Long) = Unit
+            override fun step(message: Component) = Unit
+        }
+        environment.install(ignoredProgress)
+        assertTrue(environment.isInstalled())
+
+        val python = environment.executable("python")
+        assertTrue(python.startsWith(host.environmentRoot(baseDir)), python)
+        assertEquals("1.17.0", output(CommandLine(listOf(python, "-c", "import six; print(six.__version__)"))))
+
+        host.removeEnvironment(baseDir)
+        assertEquals("gone", output(CommandLine(listOf("sh", "-c", "test -e $python && echo there || echo gone"))))
+    }
+
+    @Test
+    fun vllmExplainsWhatIsNeededWhenThereIsNoNvidiaGpu() {
+        assumeWsl()
+        val runtime = VllmRuntime(Files.createTempDirectory("chat translator vllm"), host)
+        val cfg = TranslatorConfig.current.copy(builtinModel = BuiltinModel.PLAMO_0_8B, builtinFormat = ModelFormat.NVFP4)
+        val failure = assertFailsWith<IllegalStateException> { runtime.install(cfg, object : InstallProgress {
+            override fun downloading(name: String, done: Long, total: Long) = Unit
+            override fun step(message: Component) = Unit
+        }) }
+        assertTrue(failure.message!!.contains("wsl --install"), failure.message)
+    }
+
+    @Test
+    fun serverStartedInLinuxWithSpacesInPathAnswersOnWindowsLocalhostAndStops() {
+        assumeWsl()
+        val directory = Files.createTempDirectory("chat translator's model")
+        Files.writeString(directory.resolve("config.json"), "{}")
         val port = java.net.ServerSocket(0).use { it.localPort }
         val log = Files.createTempFile("server", ".log")
-        val server = host.startServer(CommandLine(listOf("python3", "-m", "http.server", port.toString(), "--bind", "127.0.0.1")), log)
+        val server = host.startServer(
+            CommandLine(listOf("python3", "-m", "http.server", port.toString(), "--bind", "127.0.0.1", "--directory", host.pathOf(directory))),
+            log,
+        )
         val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).version(HttpClient.Version.HTTP_1_1).build()
-        val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/")).timeout(Duration.ofSeconds(2)).GET().build()
+        // フォルダの中のファイルが返るなら、空白と単一引用符を含むパスがそのまま届いている
+        val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/config.json")).timeout(Duration.ofSeconds(2)).GET().build()
         var status = -1
         val deadline = System.currentTimeMillis() + 60_000
         while (status != 200 && System.currentTimeMillis() < deadline) {
@@ -71,7 +115,6 @@ class WslCommandHostIntegrationTest {
 
         host.stopServer(server)
         assertFalse(server.isAlive)
-        val stillRunning = output(CommandLine(listOf("sh", "-c", "pgrep -f 'http.server $port' | grep -v \"^\$\$\$\" | wc -l")))
-        assertEquals("0", stillRunning, "the server must not keep running in Linux")
+        assertTrue(runCatching { http.send(request, HttpResponse.BodyHandlers.discarding()) }.isFailure, "the server must not keep running in Linux")
     }
 }
