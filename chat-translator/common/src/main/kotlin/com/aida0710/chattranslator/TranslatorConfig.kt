@@ -140,7 +140,7 @@ object TranslatorConfig {
         "VULKAN: NVIDIA / AMD / Intel の GPU で動作 (ダウンロード約 30MB、おすすめ)",
         "CUDA:   NVIDIA 専用。CUDA 13 (ドライバ 580 以降)。約 580MB",
         "CUDA12: NVIDIA 専用。古いドライバ向け",
-        "METAL:  macOS の GPU (macOS で選べるのは METAL と CPU)",
+        "METAL:  Apple silicon の Mac の GPU (Apple silicon で選べるのは METAL と CPU、Intel の Mac は CPU だけ)",
         "CPU:    GPU を使わない (遅い)",
     )
     val builtinModel = EnumSetting(

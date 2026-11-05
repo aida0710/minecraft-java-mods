@@ -66,6 +66,8 @@ class PythonEnvironment(
         )
         // パッケージの本体は venv に入ったので、ダウンロードの控えは要らない
         runUv(CommandLine(listOf(uv, "cache", "clean"), environment = uvEnvironment), progress)
+        // uv が作った Python と共有ライブラリにも印が付くことがある
+        MacQuarantine.removeFrom(baseDir.resolve("python"))
         Files.writeString(installedMarker, requirementsResource)
     }
 
@@ -77,6 +79,7 @@ class PythonEnvironment(
         Downloader.download(uvDownloadUrl, archive, uvRelease.sha256) { done, total -> progress.downloading(uvRelease.assetName, done, total) }
         Downloader.extract(archive, directory)
         Files.deleteIfExists(archive)
+        MacQuarantine.removeFrom(directory)
         check(executable.exists()) { "uv not found in ${uvRelease.assetName}" }
         return executable
     }

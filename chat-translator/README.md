@@ -9,7 +9,7 @@
   - NeoForge **26.3.0.x**
   - Fabric (Fabric Loader 0.19.5 以降 + **Fabric API** が必要。[Mod Menu](https://modrinth.com/mod/modmenu) があれば mod 一覧から設定を開ける)
 - 翻訳エンジン: **内蔵 LLM** (TranslateGemma または PLaMo 3 Translate、設定画面からインストール) / OpenAI 互換 API (Ollama・LM Studio・OpenAI・Gemini など) / Claude API / DeepL API / Google 翻訳 API
-- 内蔵 LLM が動く OS: Windows / macOS (Apple silicon・Intel) / Linux
+- 内蔵 LLM が動く OS: Windows / macOS 13.3 以降 (Apple silicon・Intel) / Linux
 - 翻訳の言語: 翻訳元・翻訳先を自由に選択 (日本語・英語・中国語・韓国語ほか約 30 言語、翻訳元は自動検出も可)
 - mod の画面表示: **日本語 / English / 简体中文** (既定は Minecraft の言語設定に合わせる。「一般」タブの「mod の表示言語」で固定も可)
 - 実装言語: Kotlin (標準ライブラリは jar に同梱済み。Kotlin for Forge や Fabric Language Kotlin は不要)
@@ -48,8 +48,8 @@ PLaMo 3 Translate は翻訳元の自動検出に対応します (TranslateGemma 
 
 | 形式 | 推論サーバー | 動く環境 | 追加のダウンロード |
 | --- | --- | --- | --- |
-| GGUF (Q4_K_M) | llama.cpp | すべて。Windows・Linux は Vulkan / CUDA / CPU、macOS は Metal / CPU | 約 30MB〜 |
-| MLX 4bit | mlx-lm | Apple silicon の macOS | 約 0.5GB |
+| GGUF (Q4_K_M) | llama.cpp | すべて。Windows・Linux は Vulkan / CUDA / CPU、Apple silicon の macOS は Metal / CPU、Intel の macOS は CPU | 約 30MB〜 |
+| MLX 4bit | mlx-lm | Apple silicon の macOS 14 以降 | 約 0.5GB |
 | FP8 | vLLM | NVIDIA GPU の Linux と、Windows の WSL2 | 約 9.5GB |
 | NVFP4 | vLLM | RTX 50 シリーズの Linux と、Windows の WSL2 | 約 9.5GB |
 
@@ -57,8 +57,9 @@ PLaMo 3 Translate は翻訳元の自動検出に対応します (TranslateGemma 
 - **FP8・NVFP4 を Windows で使う**には、先に WSL2 を入れておきます。PowerShell で `wsl --install` を実行して再起動すると Ubuntu が入り、NVIDIA のドライバーはそのまま WSL2 から使えます。Python 環境は WSL2 の中の `~/.local/share/chattranslator` に置き、「削除」でまとめて消します
 - FP8 は RTX 40 シリーズ以降で本来の速さになります。それより古い GPU では重みだけ FP8 のまま動きます。NVFP4 は RTX 50 シリーズ向けで、古い GPU では起動に失敗することがあります (RTX 3080 Ti では失敗しました)
 - TranslateGemma の MLX・FP8・NVFP4 は、Google ではなくコミュニティが変換したものです (mlx-community、kaitchup)。FP8・NVFP4 は変換者も簡単な確認しかしていないと書いています
-- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)
+- **動作を確かめていないもの**: RTX 50 シリーズでの NVFP4、RTX 40 シリーズ以降での FP8 本来の動き、WSL2 の中で GPU を使って vLLM を動かすこと、TranslateGemma の FP8・NVFP4 の翻訳、Mac の実機 (macOS の確認は GitHub Actions の仮想環境で行いました)、Intel の Mac のゲームの中での動作 (Intel の仮想環境ではゲーム本体が画面を作る前に異常終了しました。内蔵 LLM の翻訳はゲームの外のテストで確かめました)
 - mlx-lm と vLLM は Python で動きます。Python を入れておく必要はありません (mod が [uv](https://github.com/astral-sh/uv) を取得して環境を作ります)。パッケージは jar に入れた一覧で版と SHA-256 を固定し、PLaMo の中で動く Python コードはコミットを固定して取得します
+- macOS では、ダウンロードした llama-server・uv・Python 環境から隔離の印 (`com.apple.quarantine`) を外します。これらは公証されていないので、印が付いていると Gatekeeper に起動を止められるおそれがあるためです
 
 ### 翻訳エンジンの比較
 
@@ -224,7 +225,7 @@ CHATTRANSLATOR_SMOKE_MODEL=PLAMO_0_8B CHATTRANSLATOR_SMOKE_FORMAT=GGUF CHATTRANS
   ./gradlew :common:test --tests '*BuiltinRuntimeSmokeTest*' --rerun -i
 ```
 
-`.github/workflows/builtin-llm-smoke.yml` が同じテストを macOS・Windows・Linux で動かし、macOS ではゲームも起動します。GitHub の環境に NVIDIA の GPU は無いので、FP8・NVFP4 は GPU のあるマシンで上のコマンドを動かして確かめます。
+`.github/workflows/builtin-llm-smoke.yml` が同じテストを macOS (Apple silicon・Intel・Rosetta で動かす x64 の Java)・Windows・Linux で動かし、macOS ではゲームも起動します。GitHub の環境に NVIDIA の GPU は無いので、FP8・NVFP4 は GPU のあるマシンで上のコマンドを動かして確かめます。
 
 ### Python の依存パッケージ
 

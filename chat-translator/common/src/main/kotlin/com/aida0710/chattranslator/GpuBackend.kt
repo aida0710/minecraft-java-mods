@@ -13,9 +13,12 @@ enum class GpuBackend {
     fun resolvedFor(host: HostPlatform): GpuBackend = if (this in choicesFor(host)) this else defaultFor(host)
 
     companion object {
-        /** macOS の配布ファイルは 1 種類で Metal に対応している。NVIDIA・Vulkan の版は無い */
-        fun choicesFor(host: HostPlatform): List<GpuBackend> =
-            if (host.os == HostPlatform.Os.MAC) listOf(METAL, CPU) else listOf(VULKAN, CUDA, CUDA12, CPU)
+        /** macOS の配布ファイルは 1 種類。NVIDIA・Vulkan 用は無く、Intel 用は Metal 無しでビルドされている */
+        fun choicesFor(host: HostPlatform): List<GpuBackend> = when {
+            host.os != HostPlatform.Os.MAC -> listOf(VULKAN, CUDA, CUDA12, CPU)
+            host.arm -> listOf(METAL, CPU)
+            else -> listOf(CPU)
+        }
 
         fun defaultFor(host: HostPlatform): GpuBackend = choicesFor(host).first()
     }

@@ -10,11 +10,13 @@ on:
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Builtin*.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/CommandHost.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Downloader.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/GpuBackend.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/HostPlatform.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/HuggingFaceHub.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/InferenceServerRuntime.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/LlamaCppRuntime.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/LlamaReleases.kt
+      - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/MacQuarantine.kt
       - chat-translator/common/src/main/kotlin/com/aida0710/chattranslator/Python*.kt
       - chat-translator/common/src/main/resources/assets/chattranslator/python/**
 
@@ -35,6 +37,12 @@ jobs:
           - { name: macOS GGUF Gemma CPU, os: macos-latest, model: GEMMA_4B, format: GGUF, gpu: CPU }
           - { name: macOS MLX PLaMo, os: macos-latest, model: PLAMO_0_8B, format: MLX_4BIT, gpu: METAL }
           - { name: macOS MLX Gemma, os: macos-latest, model: GEMMA_4B, format: MLX_4BIT, gpu: METAL }
+          # MLX が動く最も古い macOS
+          - { name: macOS 14 MLX PLaMo, os: macos-14, model: PLAMO_0_8B, format: MLX_4BIT, gpu: METAL }
+          - { name: Intel Mac GGUF PLaMo, os: macos-15-intel, model: PLAMO_0_8B, format: GGUF, gpu: CPU }
+          # x64 版の Java を Rosetta で動かすランチャーでも、arm64 の推論サーバーを選ぶ
+          - { name: x64 Java on Apple silicon GGUF, os: macos-latest, model: PLAMO_0_8B, format: GGUF, gpu: METAL, java-arch: x64 }
+          - { name: x64 Java on Apple silicon MLX, os: macos-latest, model: PLAMO_0_8B, format: MLX_4BIT, gpu: METAL, java-arch: x64 }
           - { name: Windows GGUF PLaMo CPU, os: windows-latest, model: PLAMO_0_8B, format: GGUF, gpu: CPU }
           - { name: Linux GGUF Gemma CPU, os: ubuntu-latest, model: GEMMA_4B, format: GGUF, gpu: CPU }
     defaults:
@@ -43,10 +51,14 @@ jobs:
         working-directory: chat-translator
     steps:
       - uses: actions/checkout@v7
+      - name: Install Rosetta for the x64 Java
+        if: matrix.java-arch == 'x64'
+        run: softwareupdate --install-rosetta --agree-to-license
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
+          architecture: ${{ matrix.java-arch }}
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true
@@ -55,7 +67,7 @@ jobs:
           CHATTRANSLATOR_SMOKE_MODEL: ${{ matrix.model }}
           CHATTRANSLATOR_SMOKE_FORMAT: ${{ matrix.format }}
           CHATTRANSLATOR_SMOKE_GPU: ${{ matrix.gpu }}
-        run: ./gradlew :common:test --tests '*BuiltinRuntimeSmokeTest*' --rerun -i --console=plain 2>&1 | grep -E '\[smoke\]|\[notice\]|FAILED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
+        run: ./gradlew :common:test --tests '*BuiltinRuntimeSmokeTest*' --tests '*MacQuarantineTest*' --rerun -i --console=plain 2>&1 | grep -E '\[smoke\]|\[notice\]|FAILED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
       - name: Keep the server log
         if: always()
         uses: actions/upload-artifact@v7
@@ -92,7 +104,8 @@ jobs:
           CHATTRANSLATOR_WSL_TEST: '1'
         run: ./gradlew :common:test --tests '*WslCommandHostIntegrationTest*' --rerun -i --console=plain 2>&1 | grep -E 'FAILED|PASSED|BUILD|Exception|Error|expected' | cut -c1-600; test "${PIPESTATUS[0]}" = 0
 
-  # macOS の実機が手元に無いので、ゲームそのものも一度起動して設定画面を見る
+  # macOS の実機が手元に無いので、ゲームそのものも一度起動して設定画面を見る。
+  # GitHub の Intel の環境 (macos-15-intel) は、ゲーム本体が画面を作る前に異常終了するので入れていない
   macos-client:
     name: macOS game client
     runs-on: macos-latest

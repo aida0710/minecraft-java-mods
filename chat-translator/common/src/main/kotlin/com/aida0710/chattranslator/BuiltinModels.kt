@@ -29,11 +29,14 @@ enum class ModelFormat(val key: String, val server: InferenceServer) {
      */
     fun isAvailableOn(host: HostPlatform): Boolean = when (server) {
         InferenceServer.LLAMA_CPP -> true
-        InferenceServer.MLX_LM -> host.os == HostPlatform.Os.MAC && host.arm
+        InferenceServer.MLX_LM -> host.os == HostPlatform.Os.MAC && host.arm && host.macOsMajorVersion >= MLX_MINIMUM_MACOS_MAJOR_VERSION
         InferenceServer.VLLM -> host.os != HostPlatform.Os.MAC && !host.arm
     }
 
     companion object {
+        /** python/mlx-requirements.txt で固定した mlx の配布ファイルは macosx_14_0 以降しか無い */
+        private const val MLX_MINIMUM_MACOS_MAJOR_VERSION = 14
+
         fun availableOn(host: HostPlatform): List<ModelFormat> = entries.filter { it.isAvailableOn(host) }
     }
 }

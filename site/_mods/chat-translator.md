@@ -2,7 +2,7 @@
 title: Chat Translator
 order: 1
 # 公開している最新の版。Release のタグ (chat-translator-v<版>) とダウンロードの行き先に使う
-version: "0.3.0"
+version: "0.3.1"
 icon: /assets/chat-translator/icon.svg
 # 一覧のカードの名前の色 (Minecraft のレアリティの色に合わせる)
 color: "#FF55FF"
@@ -107,7 +107,7 @@ features:
 | エンジン | 料金 | 向いていること |
 | --- | --- | --- |
 | 内蔵 LLM（PLaMo 3 Translate 0.8B / 2B / 8B） | 無料 | オフラインで使える。既定の 0.8B は約 0.6GB と軽い。一部の言語は未対応。Built with PLaMo |
-| 内蔵 LLM（TranslateGemma 4B） | 無料 | オフラインで使える。VRAM 4GB 程度 |
+| 内蔵 LLM（PLaMo 3 Translate 0.8B） | 無料 | オフラインで使える。VRAM 約 0.6GB |
 | Claude API | 従量課金 | 文脈やスラングに強い |
 | DeepL / Google | 従量課金（無料枠あり） | 速い |
 | OpenAI 互換（Ollama・LM Studio など） | エンジンによる | 手元の LLM を使える |
@@ -116,7 +116,7 @@ features:
 
 - クラウドのエンジンを選ぶと、翻訳する文はそのサービスに送られます
 - 内蔵 LLM は、推論サーバー（GitHub・PyPI）とモデル（Hugging Face）をダウンロードし、SHA-256 やコミットの固定で照合してから使います
-- 内蔵 LLM は Windows・macOS・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます。RTX 50 シリーズでの NVFP4 と、Mac の実機での動作はまだ確かめていません
+- 内蔵 LLM は Windows・macOS 13.3 以降・Linux で動きます。形式は GGUF のほか、Apple silicon の MLX（macOS 14 以降）、NVIDIA GPU の FP8・NVFP4（Linux か WSL2）を選べます。Intel の Mac は CPU で動きます。RTX 50 シリーズでの NVFP4 と、Mac の実機での動作はまだ確かめていません
 - 送信の翻訳は最初は OFF です。「送信」タブで ON にします
 - Hypixel とは関係のない、個人が作った mod です。サーバーのルールに合うかはご自身で確かめてください
 
@@ -137,7 +137,7 @@ features:
 | Engine | Cost | Good for |
 | --- | --- | --- |
 | Built-in LLM (PLaMo 3 Translate 0.8B / 2B / 8B) | Free | Works offline. The default 0.8B is only about 0.6 GB. Some languages are not supported. Built with PLaMo |
-| Built-in LLM (TranslateGemma 4B) | Free | Works offline. Needs about 4 GB of VRAM |
+| Built-in LLM (PLaMo 3 Translate 0.8B) | Free | Works offline. Needs about 0.6 GB of VRAM |
 | Claude API | Pay as you go | Context and slang |
 | DeepL / Google | Pay as you go (free tier) | Speed |
 | OpenAI-compatible (Ollama, LM Studio, …) | Depends on the engine | Using an LLM you already run |
@@ -146,7 +146,7 @@ features:
 
 - With a cloud engine, the text being translated is sent to that service
 - The built-in LLM downloads an inference server (GitHub, PyPI) and a model (Hugging Face), and verifies them with SHA-256 or a pinned commit before use
-- The built-in LLM runs on Windows, macOS and Linux. Besides GGUF, you can choose MLX on Apple silicon, or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2). NVFP4 on RTX 50 series GPUs and real Macs have not been verified yet
+- The built-in LLM runs on Windows, macOS 13.3 or later, and Linux. Besides GGUF, you can choose MLX on Apple silicon (macOS 14 or later), or FP8 and NVFP4 on NVIDIA GPUs (Linux or WSL2). Intel Macs run on the CPU. NVFP4 on RTX 50 series GPUs and real Macs have not been verified yet
 - Translating sent messages is off by default. Turn it on in the "Sending" tab
 - This is a personal project and is not affiliated with Hypixel. Check that it fits the rules of the server you play on
 
