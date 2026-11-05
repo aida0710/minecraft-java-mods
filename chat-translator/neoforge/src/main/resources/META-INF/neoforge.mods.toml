@@ -12,7 +12,7 @@ displayURL="https://aida0710.github.io/minecraft-java-mods/chat-translator/"
 # NeoForge 26.3 では logoFile は非推奨で、使うと起動時に警告の画面が出る。正方形のアイコンは iconFile に書く
 iconFile="assets/chattranslator/icon.png"
 description='''
-Translates chat, item tooltips and books, and sends your own chat translated, with a built-in LLM (llama.cpp + TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
+Translates chat, item tooltips and books, and sends your own chat translated, with a built-in LLM (PLaMo 3 Translate or TranslateGemma) or Claude / DeepL / Google / OpenAI-compatible APIs.
 チャット・アイテムの説明・本を翻訳し、自分の発言も翻訳して送れます (日本語 / English / 简体中文 UI)。
 '''
 

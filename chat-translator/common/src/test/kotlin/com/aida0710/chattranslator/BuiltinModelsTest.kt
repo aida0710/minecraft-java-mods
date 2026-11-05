@@ -13,6 +13,13 @@ class BuiltinModelsTest {
     private val linux = HostPlatform(HostPlatform.Os.LINUX, arm = false)
 
     @Test
+    fun defaultModelSupportsDefaultLanguagesForReadingAndSending() {
+        val defaults = TranslatorConfig.current
+        assertEquals(null, defaults.unsupportedBuiltinLanguage())
+        assertEquals(null, defaults.forSending().unsupportedBuiltinLanguage())
+    }
+
+    @Test
     fun appleSiliconCanChooseGgufOrMlx() {
         assertEquals(listOf(ModelFormat.GGUF, ModelFormat.MLX_4BIT), ModelFormat.availableOn(appleSilicon))
     }

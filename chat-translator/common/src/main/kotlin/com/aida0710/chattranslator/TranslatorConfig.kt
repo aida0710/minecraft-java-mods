@@ -144,7 +144,7 @@ object TranslatorConfig {
         "CPU:    GPU を使わない (遅い)",
     )
     val builtinModel = EnumSetting(
-        "builtin.model", BuiltinModel.GEMMA_4B, BuiltinModel.entries,
+        "builtin.model", BuiltinModel.PLAMO_0_8B, BuiltinModel.entries,
         "GEMMA_4B / GEMMA_12B:               TranslateGemma",
         "PLAMO_0_8B / PLAMO_2B / PLAMO_8B:   PLaMo 3 Translate (Built with PLaMo)",
     )

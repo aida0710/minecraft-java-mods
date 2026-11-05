@@ -100,14 +100,14 @@ features:
 1. [ダウンロード](https://github.com/aida0710/minecraft-java-mods/releases)から、使うローダーの jar を取ります（Forge は `chattranslator-forge-…jar`、NeoForge は `chattranslator-neoforge-…jar`、Fabric は `chattranslator-fabric-…jar`）。Fabric では [Fabric API](https://modrinth.com/mod/fabric-api) も必要です
 2. jar を `.minecraft/mods/` に入れて起動します
 3. ワールドかサーバーに入り、`/chattranslator` で設定画面を開きます
-4. 「翻訳エンジン」タブでエンジンを選びます。内蔵 LLM なら「インストール」を押すだけです（約 2.5GB。ゲーム中だけ動きます）。クラウドのサービスなら API キーを貼り付けます
+4. 「翻訳エンジン」タブでエンジンを選びます。内蔵 LLM なら「インストール」を押すだけです（約 0.6GB。ゲーム中だけ動きます）。クラウドのサービスなら API キーを貼り付けます
 
 ## 翻訳エンジン
 
 | エンジン | 料金 | 向いていること |
 | --- | --- | --- |
+| 内蔵 LLM（PLaMo 3 Translate 0.8B / 2B / 8B） | 無料 | オフラインで使える。既定の 0.8B は約 0.6GB と軽い。一部の言語は未対応。Built with PLaMo |
 | 内蔵 LLM（TranslateGemma 4B） | 無料 | オフラインで使える。VRAM 4GB 程度 |
-| 内蔵 LLM（PLaMo 3 Translate 0.8B / 2B / 8B） | 無料 | オフラインで使える。0.8B は約 0.6GB と軽い。一部の言語は未対応。Built with PLaMo |
 | Claude API | 従量課金 | 文脈やスラングに強い |
 | DeepL / Google | 従量課金（無料枠あり） | 速い |
 | OpenAI 互換（Ollama・LM Studio など） | エンジンによる | 手元の LLM を使える |
@@ -130,14 +130,14 @@ features:
 1. Get the jar for your loader from [Downloads](https://github.com/aida0710/minecraft-java-mods/releases): `chattranslator-forge-…jar` for Forge, `chattranslator-neoforge-…jar` for NeoForge, or `chattranslator-fabric-…jar` for Fabric. Fabric also needs [Fabric API](https://modrinth.com/mod/fabric-api)
 2. Put the jar in `.minecraft/mods/` and start the game
 3. Join a world or a server and open the settings with `/chattranslator`
-4. Pick an engine on the "Engine" tab. For the built-in LLM, just press "Install" (about 2.5 GB; it only runs while you play). For a cloud service, paste your API key
+4. Pick an engine on the "Engine" tab. For the built-in LLM, just press "Install" (about 0.6 GB; it only runs while you play). For a cloud service, paste your API key
 
 ## Translation engines
 
 | Engine | Cost | Good for |
 | --- | --- | --- |
+| Built-in LLM (PLaMo 3 Translate 0.8B / 2B / 8B) | Free | Works offline. The default 0.8B is only about 0.6 GB. Some languages are not supported. Built with PLaMo |
 | Built-in LLM (TranslateGemma 4B) | Free | Works offline. Needs about 4 GB of VRAM |
-| Built-in LLM (PLaMo 3 Translate 0.8B / 2B / 8B) | Free | Works offline. 0.8B is only about 0.6 GB. Some languages are not supported. Built with PLaMo |
 | Claude API | Pay as you go | Context and slang |
 | DeepL / Google | Pay as you go (free tier) | Speed |
 | OpenAI-compatible (Ollama, LM Studio, …) | Depends on the engine | Using an LLM you already run |
