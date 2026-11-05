@@ -1,5 +1,6 @@
 package com.aida0710.chattranslator
 
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -44,6 +45,15 @@ class BuiltinModelsTest {
         assertEquals(GpuBackend.METAL, GpuBackend.VULKAN.resolvedFor(appleSilicon))
         assertEquals(GpuBackend.VULKAN, GpuBackend.METAL.resolvedFor(windows))
         assertEquals(GpuBackend.CPU, GpuBackend.CPU.resolvedFor(appleSilicon))
+    }
+
+    @Test
+    fun gemmaProcessorConfigsAreAddedOnlyWhenMissing() {
+        val directory = Files.createTempDirectory("gemma")
+        Files.writeString(directory.resolve("processor_config.json"), "kept")
+        VllmRuntime.addMissingGemmaProcessorConfigs(directory)
+        assertEquals("kept", Files.readString(directory.resolve("processor_config.json")))
+        assertTrue(Files.readString(directory.resolve("preprocessor_config.json")).contains("Gemma3ImageProcessor"))
     }
 
     @Test

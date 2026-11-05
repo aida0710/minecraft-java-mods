@@ -155,7 +155,7 @@ class BuiltinServerManager(
         val deadline = System.currentTimeMillis() + runtime.startupTimeout.toMillis()
         val serverName = cfg.builtinFormat.server.displayName
         while (System.currentTimeMillis() < deadline) {
-            if (!proc.isAlive) throw IllegalStateException("$serverName exited with code ${proc.exitValue()}: ${lastErrorLine(log) ?: "server.log"}")
+            if (!proc.isAlive) throw IllegalStateException("$serverName exited with code ${proc.exitValue()}: ${firstErrorLine(log) ?: "server.log"}")
             if (healthy(url)) {
                 warmUp(url, cfg, deadline)
                 endpoint = "$url/v1"
@@ -180,9 +180,13 @@ class BuiltinServerManager(
         BuiltinProvider({ "$url/v1" }, { true }).translate("Hello.", warmUpConfig)
     }
 
-    /** サーバーのログの最後のエラー。vLLM の失敗の理由 (GPU が対応していないなど) はここにしか出ない */
-    private fun lastErrorLine(log: Path): String? = runCatching {
-        Files.readAllLines(log).lastOrNull { line -> ERROR_LINE_MARKERS.any { line.contains(it) } }?.trim()
+    /**
+     * サーバーのログの最初のエラー。vLLM の失敗の理由 (GPU が対応していない、メモリが足りないなど) はここにしか出ない。
+     * 最後の行は「上を見てください」としか書いていないので使わない。"(EngineCore pid=1) ERROR ... [core.py:1] " は取り除く
+     */
+    private fun firstErrorLine(log: Path): String? = runCatching {
+        Files.readAllLines(log).firstOrNull { line -> ERROR_LINE_MARKERS.any { line.contains(it) } }
+            ?.substringAfter("] ")?.trim()?.take(MAX_ERROR_TEXT_LENGTH)
     }.getOrNull()
 
     /**
@@ -262,6 +266,7 @@ class BuiltinServerManager(
     private companion object {
         const val MAX_RESTARTS = 3
         const val HEALTH_POLL_MILLIS = 500L
-        val ERROR_LINE_MARKERS = listOf("Error:", "ERROR", "error:")
+        val ERROR_LINE_MARKERS = listOf("Error:", "error:")
+        const val MAX_ERROR_TEXT_LENGTH = 300
     }
 }

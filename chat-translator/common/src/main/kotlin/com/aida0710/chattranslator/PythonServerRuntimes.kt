@@ -1,9 +1,11 @@
 package com.aida0710.chattranslator
 
+import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.exists
 
 /** Python で動く推論サーバーの共通部分: Python 環境とモデルのフォルダをそろえる */
 abstract class PythonServerRuntime(
@@ -21,10 +23,15 @@ abstract class PythonServerRuntime(
         checkPrerequisites()
         environment.install(progress)
         val directory = modelDirectory(cfg)
-        if (hub.isSnapshotComplete(directory)) return
-        val distribution = cfg.builtinDistribution as SnapshotDistribution
-        hub.downloadSnapshot(distribution, directory) { done, total -> progress.downloading(distribution.directoryName, done, total) }
+        if (!hub.isSnapshotComplete(directory)) {
+            val distribution = cfg.builtinDistribution as SnapshotDistribution
+            hub.downloadSnapshot(distribution, directory) { done, total -> progress.downloading(distribution.directoryName, done, total) }
+        }
+        prepareModelDirectory(cfg, directory)
     }
+
+    /** ダウンロードしたフォルダに、推論サーバーが必要とするものを足す */
+    protected open fun prepareModelDirectory(cfg: TranslatorConfig.Values, directory: Path) = Unit
 
     /** 何 GB もダウンロードしてから動かないと分かるのを避けるため、先に確かめる */
     protected open fun checkPrerequisites() = Unit
@@ -69,6 +76,10 @@ class VllmRuntime(
         readTotalVramBytes()
     }
 
+    override fun prepareModelDirectory(cfg: TranslatorConfig.Values, directory: Path) {
+        if (cfg.builtinModel.family == ModelFamily.TRANSLATE_GEMMA) addMissingGemmaProcessorConfigs(directory)
+    }
+
     override fun serverCommand(cfg: TranslatorConfig.Values, port: Int): CommandLine {
         val distribution = cfg.builtinDistribution
         val utilization = gpuMemoryUtilization(distribution.bytes, readTotalVramBytes())
@@ -103,12 +114,25 @@ class VllmRuntime(
 
         /**
          * vLLM の既定 (GPU の 92%) はゲームと同居できず、起動時に空きが足りないと止まるので、モデルが動くだけの割合を渡す。
-         * 重みに足す 2GiB は、文脈 4096 トークン × 2 本の KV キャッシュと PyTorch の作業領域の分。RTX 3080 Ti で確かめた値。
+         * 重みに足す 2GiB は、文脈 4096 トークン × 2 本の KV キャッシュと PyTorch の作業領域の分。RTX 3080 Ti と PLaMo 0.8B で確かめた値。
          */
         private const val VLLM_WORKING_MEMORY_BYTES = 2L * 1024 * BYTES_PER_MEBIBYTE
 
         /** 全部を割り当てると vLLM が起動できない。vLLM の既定に近い値を上限にする */
         private const val MAX_GPU_MEMORY_UTILIZATION = 0.9
+
+        /**
+         * TranslateGemma の FP8・NVFP4 の変換版には画像の前処理の設定が入っていないが、vLLM は起動時に読もうとして止まる。
+         * 文章しか訳さないので中身は使われない。google/translategemma-4b-it の設定を jar に入れて補う。
+         */
+        internal fun addMissingGemmaProcessorConfigs(directory: Path) {
+            for (name in listOf("preprocessor_config.json", "processor_config.json")) {
+                val target = directory.resolve(name)
+                if (target.exists()) continue
+                val stream = VllmRuntime::class.java.getResourceAsStream("/assets/chattranslator/python/gemma3/$name") ?: error("missing $name")
+                stream.use { Files.copy(it, target) }
+            }
+        }
 
         internal fun gpuMemoryUtilization(modelBytes: Long, totalVramBytes: Long): Double =
             ((modelBytes + VLLM_WORKING_MEMORY_BYTES).toDouble() / totalVramBytes).coerceAtMost(MAX_GPU_MEMORY_UTILIZATION)

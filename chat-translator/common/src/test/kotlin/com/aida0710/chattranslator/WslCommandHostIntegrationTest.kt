@@ -92,6 +92,29 @@ class WslCommandHostIntegrationTest {
     }
 
     @Test
+    fun watchdogStopsServerInLinuxAfterGameExits() {
+        assumeWsl()
+        val port = java.net.ServerSocket(0).use { it.localPort }
+        val server = host.startServer(CommandLine(listOf("python3", "-m", "http.server", port.toString(), "--bind", "127.0.0.1")), Files.createTempFile("server", ".log"))
+        val isServing = {
+            output(CommandLine(listOf("sh", "-c", "python3 -c 'import socket; print(socket.socket().connect_ex((chr(49)+chr(50)+chr(55)+chr(46)+chr(48)+chr(46)+chr(48)+chr(46)+chr(49), $port)))'"))) == "0"
+        }
+        waitUntil(isServing)
+        assertTrue(isServing(), "the server must be running")
+
+        // ゲームの代わりに、すぐ終わる Windows のプロセスの終了を待たせる
+        val game = ProcessBuilder("powershell.exe", "-NoProfile", "-Command", "Start-Sleep -Seconds 3").start()
+        ProcessBuilder(host.watchdogCommand(game.pid(), server.pid())).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+        waitUntil { !server.isAlive }
+        assertFalse(server.isAlive, "the watchdog must stop the server")
+    }
+
+    private fun waitUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 60_000
+        while (!condition() && System.currentTimeMillis() < deadline) Thread.sleep(500)
+    }
+
+    @Test
     fun serverStartedInLinuxWithSpacesInPathAnswersOnWindowsLocalhostAndStops() {
         assumeWsl()
         val directory = Files.createTempDirectory("chat translator's model")

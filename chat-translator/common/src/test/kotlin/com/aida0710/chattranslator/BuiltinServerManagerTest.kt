@@ -69,14 +69,16 @@ class BuiltinServerManagerTest {
     }
 
     @Test
-    fun serverThatExitsShowsLastErrorFromItsLog() {
+    fun serverThatExitsShowsItsFirstErrorInsteadOfTheGenericLastOne() {
         assumeTrue(HostPlatform.current.os != HostPlatform.Os.WINDOWS)
-        val script = "echo 'INFO loading'; echo 'ValueError: type fp8e4nv not supported in this architecture'; exit 1"
+        val script = "echo 'INFO loading'; " +
+            "echo '(EngineCore pid=1) ERROR 11-05 [core.py:1584] ValueError: type fp8e4nv not supported in this architecture'; " +
+            "echo 'RuntimeError: Engine core initialization failed. See root cause above.'; exit 1"
         val manager = manager(Files.createTempDirectory("builtin"), FakeRuntime(listOf("sh", "-c", script)))
         manager.startAsync(TranslatorConfig.current.copy(builtinPort = freePort()))
         waitFor { manager.state == BuiltinServerManager.State.FAILED }
         assertEquals(BuiltinServerManager.State.FAILED, manager.state)
-        assertTrue(manager.lastError!!.contains("fp8e4nv"), manager.lastError)
+        assertTrue(manager.lastError!!.contains("exited with code 1: ValueError: type fp8e4nv"), manager.lastError)
         assertTrue(notices.any { it.contains("fp8e4nv") }, notices.toString())
         assertFalse(manager.endpoint != null)
     }
