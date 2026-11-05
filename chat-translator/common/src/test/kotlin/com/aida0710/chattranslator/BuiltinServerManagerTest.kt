@@ -18,7 +18,7 @@ class BuiltinServerManagerTest {
         T.setUiLanguage("en_us")
     }
 
-    private val notices = mutableListOf<String>()
+    private val notices = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     /** どの推論サーバーの代わりにもなる。command がプロセスになり、/health と Completions はテストのサーバーが答える */
     private class FakeRuntime(private val command: List<String>, private val timeout: Duration = Duration.ofSeconds(20)) : InferenceServerRuntime {
@@ -79,6 +79,8 @@ class BuiltinServerManagerTest {
         waitFor { manager.state == BuiltinServerManager.State.FAILED }
         assertEquals(BuiltinServerManager.State.FAILED, manager.state)
         assertTrue(manager.lastError!!.contains("exited with code 1: ValueError: type fp8e4nv"), manager.lastError)
+        // 通知は状態が変わった後に届く
+        waitFor { notices.any { it.contains("fp8e4nv") } }
         assertTrue(notices.any { it.contains("fp8e4nv") }, notices.toString())
         assertFalse(manager.endpoint != null)
     }

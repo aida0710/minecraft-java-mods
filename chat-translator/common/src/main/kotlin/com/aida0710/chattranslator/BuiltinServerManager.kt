@@ -120,8 +120,9 @@ class BuiltinServerManager(
                 lastError = null
                 start(cfg)
             } catch (e: Exception) {
-                state = State.FAILED
+                // 設定画面は FAILED を見て理由を出すので、理由を先に入れる
                 lastError = e.message ?: e.toString()
+                state = State.FAILED
                 ChatTranslator.LOGGER.error("Failed to start built-in inference server", e)
                 notify(T.tr("builtin.start_failed", e.message ?: e.toString()), false)
             } finally {
