@@ -22,11 +22,22 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '25'
+          # 最後に書いた版が JAVA_HOME になる。JDK 8 は ForgeGradle 用 (次の次の手順)
+          java-version: |
+            8
+            25
 
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # ForgeGradle は JDK 8 が無いと GitHub から取るが、Actions では接続の待ち時間切れで続けて失敗することがある
+      # (2026-11-05 に 3 回続けて失敗)。自分のキャッシュの中の <名前>/bin/java を JDK として探すので、ダウンロードせずに済むよう置いておく
+      - name: Let ForgeGradle use the JDK 8 from setup-java
+        run: |
+          MAVENIZER_CACHE="$HOME/.gradle/caches/minecraftforge/forgegradle/mavenizer/caches"
+          mkdir -p "$MAVENIZER_CACHE"
+          ln -sfn "$JAVA_HOME_8_X64" "$MAVENIZER_CACHE/temurin-8-from-setup-java"
 
       # タグの版と gradle.properties の mod_version が違うと、別の版の jar を配ってしまうので先に止める
       - name: Check release version
