@@ -57,10 +57,12 @@ abstract class HttpProvider : TranslationProvider {
     }
 
     /** LLM 向けの指示文 (クラウド LLM / OpenAI 互換で共通) */
-    protected fun llmInstructions(cfg: TranslatorConfig.Values): String = buildString {
+    protected fun llmInstructions(cfg: TranslatorConfig.Values, text: String): String = buildString {
         append("Translate the user's text from ${Languages.englishName(cfg.sourceCode)} to ${Languages.englishName(cfg.targetCode)}. ")
         append("Output only the translation, with no explanations, quotes, or notes. ")
         append("Keep placeholder tokens such as ITEM1 and ITEM2 exactly as they are. ")
+        // ツールチップの色の区間 ([StyleMarkup])
+        if (StyleMarkup.hasTags(text)) append("Tags such as <s1> and </s1> mark colored words: keep every tag, placed around the translation of the words it marks. ")
         if (cfg.llmContext.isNotBlank()) append(cfg.llmContext.trim())
     }
 
@@ -124,7 +126,7 @@ class OpenAiCompatibleProvider : HttpProvider() {
             addProperty("temperature", cfg.temperature)
             addProperty("stream", false)
             add("messages", JsonArray().apply {
-                val system = cfg.openaiSystemPrompt.ifBlank { if (cfg.openaiUsePromptTemplate) "" else llmInstructions(cfg) }
+                val system = cfg.openaiSystemPrompt.ifBlank { if (cfg.openaiUsePromptTemplate) "" else llmInstructions(cfg, text) }
                 if (system.isNotBlank()) add(message("system", system))
                 add(message("user", if (cfg.openaiUsePromptTemplate) cfg.buildPrompt(text) else text))
             })
@@ -155,7 +157,7 @@ class ClaudeProvider(private val baseUrl: String = "https://api.anthropic.com") 
         val body = JsonObject().apply {
             addProperty("model", cfg.claudeModel)
             addProperty("max_tokens", 1024)
-            addProperty("system", llmInstructions(cfg))
+            addProperty("system", llmInstructions(cfg, text))
             add("messages", JsonArray().apply { add(message("user", text)) })
             // 短い翻訳なので思考は最小限にして速度とコストを抑える (Haiku 4.5 は effort 非対応)
             if (!cfg.claudeModel.startsWith("claude-haiku-4")) {
@@ -191,6 +193,8 @@ class DeepLProvider(private val baseUrlOverride: String? = null) : HttpProvider(
             add("text", JsonArray().apply { add(text) })
             addProperty("target_lang", target)
             Languages.get(cfg.sourceCode)?.deeplSource?.let { addProperty("source_lang", it) }
+            // ツールチップの色の区間のタグ ([StyleMarkup]) を訳文に残す
+            if (StyleMarkup.hasTags(text)) addProperty("tag_handling", "xml")
         }
         val host = if (cfg.deeplApiKey.trim().endsWith(":fx")) "api-free.deepl.com" else "api.deepl.com"
         val response = post("${baseUrlOverride ?: "https://$host"}/v2/translate", body.toString(), cfg, "Authorization" to "DeepL-Auth-Key ${cfg.deeplApiKey.trim()}")
@@ -209,7 +213,8 @@ class GoogleProvider(private val baseUrl: String = "https://translation.googleap
             addProperty("q", text)
             addProperty("target", googleCode(cfg.targetCode))
             if (cfg.sourceCode != Languages.AUTO) addProperty("source", googleCode(cfg.sourceCode))
-            addProperty("format", "text")
+            // ツールチップの色の区間のタグ ([StyleMarkup]) を訳文に残す (訳文の文字参照は StyleMarkup が戻す)
+            addProperty("format", if (StyleMarkup.hasTags(text)) "html" else "text")
         }
         val key = URLEncoder.encode(cfg.googleApiKey.trim(), Charsets.UTF_8)
         val response = post("$baseUrl/language/translate/v2?key=$key", body.toString(), cfg)

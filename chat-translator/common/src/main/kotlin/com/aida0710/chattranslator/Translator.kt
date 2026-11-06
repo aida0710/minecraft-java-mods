@@ -124,8 +124,8 @@ class Translator(
         val provider = provider(cfg)
         val p = itemNames.protect(text)
         if (p.names.isEmpty()) return provider.translate(text, cfg)
-        // 保護語だけの文 (記号のみ残る) は訳さない
-        if (p.text.replace(PLACEHOLDER, "").none { it.isLetter() }) return text
+        // 保護語だけの文 (記号のみ残る) は訳さない (ツールチップの色のタグ "<s1>" の文字は数えない)
+        if (StyleMarkup.strip(p.text).replace(PLACEHOLDER, "").none { it.isLetter() }) return text
         itemNames.restore(provider.translate(p.text, cfg), p.names)?.let { return it }
         ChatTranslator.LOGGER.info("Protected term lost in translation; retrying without protection: {}", text)
         return provider.translate(text, cfg)
