@@ -10,8 +10,9 @@ import java.util.Optional
 /**
  * アイテムのツールチップ (名前・説明文) を翻訳する。
  *
- * SkyBlock の lore は 1 つの文を短い行に折り返して書いているため、
- * 同じ色で続く行を 1 段落にまとめて翻訳し、訳文を元の幅で折り返し直す。
+ * SkyBlock の lore は 1 つの文を短い行に折り返して書いているため、折り返しの続きの行を 1 段落にまとめて翻訳し、
+ * 訳文を元の幅で折り返し直す (どの行をつなげるかは [LoreParagraphs])。
+ * 色の付いた語句はタグで囲んで翻訳エンジンに渡し、訳文の対応する語句に同じ色を付ける ([StyleMarkup])。
  * 毎フレーム呼ばれるため、未翻訳の段落は原文のまま表示しつつ裏で翻訳を予約し、
  * キャッシュに入った時点で訳文に切り替わる。
  */
@@ -24,14 +25,17 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Component>>?) = size > 512
     }
 
-    private data class Run(val style: Style, val text: String)
-
     private class Line(val component: Component) {
         val runs = runs(component)
         val text = runs.joinToString("") { it.text }
         val trimmed = text.trim()
         /** 文字のある最初のセグメントのスタイル = その行の基本の色 */
         val baseStyle: Style = runs.firstOrNull { it.text.isNotBlank() }?.style ?: Style.EMPTY
+        /** 前後の空白を除いた部分の区間 */
+        val trimmedRuns: List<Span<Style>> get() {
+            val lead = text.length - text.trimStart().length
+            return StyleMarkup.slice(runs, lead until lead + trimmed.length)
+        }
     }
 
     fun onTooltip(lines: MutableList<Component>) {
@@ -44,23 +48,16 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
         // 1 行目はアイテム名。固有名詞なので既知の SkyBlock アイテムなら英語のまま
         val name = parsed[0]
         val keepName = !cfg.tooltipTranslateItemName || (translator.dictionaries.itemNamesActive && translator.itemNames.isItemName(name.trimmed))
-        if (keepName || !isProse(name.trimmed, cfg)) out.add(name.component) else out.addAll(translateParagraph(listOf(name), cfg))
+        val lore = parsed.subList(1, parsed.size)
+        val font = Minecraft.getInstance().font
+        val items = lore.map { LoreParagraphs.Line(it.trimmed, isProse(it.trimmed, cfg), it.baseStyle.color) }
+        // 元の lore の折り返し幅の目安 (最も長い文章の行)
+        val wrapWidth = items.filter { it.prose }.maxOfOrNull { font.width(it.text) } ?: 0
 
-        var i = 1
-        while (i < parsed.size) {
-            val line = parsed[i]
-            if (!isProse(line.trimmed, cfg)) {
-                out.add(line.component)
-                i++
-                continue
-            }
-            // 同じ基本色の文章行が続く限り 1 段落とみなす (見出しやステータス行は色や形式が違うので区切られる)
-            var j = i + 1
-            if (!isListItem(line.trimmed)) {
-                while (j < parsed.size && isProse(parsed[j].trimmed, cfg) && !isListItem(parsed[j].trimmed) && sameColor(parsed[j].baseStyle, line.baseStyle)) j++
-            }
-            out.addAll(translateParagraph(parsed.subList(i, j), cfg))
-            i = j
+        if (keepName || !isProse(name.trimmed, cfg)) out.add(name.component) else out.addAll(translateParagraph(listOf(name), wrapWidth, cfg))
+        for (range in LoreParagraphs.split(items, wrapWidth) { font.width(it) }) {
+            if (items[range.first].prose) out.addAll(translateParagraph(lore.subList(range.first, range.last + 1), wrapWidth, cfg))
+            else out.add(lore[range.first].component)
         }
 
         lines.clear()
@@ -70,30 +67,35 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
     private fun isProse(text: String, cfg: TranslatorConfig.Values) =
         TextUtil.looksTranslatable(text, cfg.minLength) && !identifier.matches(text) && !translator.isSkipped(text)
 
-    private fun sameColor(a: Style, b: Style) = a.color == b.color
-
-    /** 数値や記号で始まる行 ("6 Attack Damage", "+50 Strength", "• Line") は箇条書きなのでつなげない */
-    private fun isListItem(text: String) = text.firstOrNull()?.let { it.isDigit() || it in "+-•▸◆►✦" } ?: false
-
-    private fun translateParagraph(para: List<Line>, cfg: TranslatorConfig.Values): List<Component> {
+    /** loreWidth は元の lore の折り返し幅の目安。訳文はこの幅まで使って折り返す (1 行の項目が訳で長くなっても折り返さないように) */
+    private fun translateParagraph(para: List<Line>, loreWidth: Int, cfg: TranslatorConfig.Values): List<Component> {
         val originals = para.map { it.component }
         val joined = para.joinToString(" ") { it.trimmed }
-        val translated = translator.translateInBackground(joined)
-        if (translated == null || translated == joined) return originals
+        // 行をつなげた区間の列 (行の間は空白)
+        val spans = para.flatMapIndexed { i, line -> if (i == 0) line.trimmedRuns else listOf(Span(line.baseStyle, " ")) + line.trimmedRuns }
+        val base = StyleMarkup.dominant(spans)
+        // 辞書の訳語は原文と完全一致で引くので、色の区間があっても平文で訳す
+        val markup = if (translator.dictionaries.lookup(joined) == null) StyleMarkup.encode(spans, base) else null
+        val source = markup?.text ?: joined
+        val translated = translator.translateInBackground(source)
+        if (translated == null || translated == source) return originals
 
-        val key = "${cfg.tooltipShowOriginal}\u0000$joined\u0000$translated"
+        val key = "${cfg.tooltipShowOriginal}\u0000$loreWidth\u0000$source\u0000$translated"
         rendered[key]?.let { return it }
 
         val font = Minecraft.getInstance().font
         val indent = para[0].text.takeWhile { it == ' ' }
-        // 元の行幅に合わせる (極端に狭いと読みにくいので下限あり)
-        val maxWidth = maxOf(para.maxOf { font.width(it.component) }, 120) - font.width(indent)
-        val base = para[0].baseStyle
-        val highlights = highlights(para, base)
+        // タグが崩れていたら、タグを除いた訳文に原文の色付きの語句を探して色を付け直す
+        val styled = markup?.let { StyleMarkup.decode(translated, it, base) }
+            ?: highlighted(if (markup != null) StyleMarkup.strip(translated) else translated, base, highlights(para, base))
 
-        val result = TextWrap.wrap(translated, maxWidth) { font.width(it) }
-            .map { styledLine(indent + it, base, highlights) }
-            .toMutableList<Component>()
+        // 元の行幅に合わせる (極端に狭いと読みにくいので下限あり)。訳文が長ければ、元の行数に収まるよう lore の 1.5 倍まで広げる
+        val minWidth = maxOf(para.maxOf { font.width(it.component) }, loreWidth, 120) - font.width(indent)
+        val textWidth = font.width(styled.joinToString("") { it.text })
+        val maxWidth = TextWrap.fitWidth(textWidth, para.size, minWidth, minWidth * 3 / 2)
+        val result = TextWrap.wrapSpans(styled, maxWidth) { font.width(it) }
+            .map { component(listOf(Span(base, indent)) + it) }
+            .toMutableList()
         if (cfg.tooltipShowOriginal) {
             originals.forEach { result += Component.literal(TextUtil.stripFormatting(it.string)).withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC) }
         }
@@ -110,11 +112,11 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
             .distinctBy { it.first }
             .sortedByDescending { it.first.length }
 
-    private fun styledLine(text: String, base: Style, highlights: List<Pair<String, Style>>): Component {
-        val root: MutableComponent = Component.empty()
+    private fun highlighted(text: String, base: Style, highlights: List<Pair<String, Style>>): List<Span<Style>> {
+        val out = mutableListOf<Span<Style>>()
         val plain = StringBuilder()
         fun flush() {
-            if (plain.isNotEmpty()) root.append(Component.literal(plain.toString()).withStyle(base))
+            if (plain.isNotEmpty()) out += Span(base, plain.toString())
             plain.clear()
         }
         var i = 0
@@ -127,7 +129,7 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
             }
             if (hit != null) {
                 flush()
-                root.append(Component.literal(hit.first).withStyle(hit.second))
+                out += Span(hit.second, hit.first)
                 i += hit.first.length
             } else {
                 plain.append(text[i])
@@ -135,13 +137,19 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
             }
         }
         flush()
+        return out
+    }
+
+    private fun component(spans: List<Span<Style>>): Component {
+        val root: MutableComponent = Component.empty()
+        for (s in spans) if (s.text.isNotEmpty()) root.append(Component.literal(s.text).withStyle(s.style))
         return root
     }
 
     private companion object {
         /** Component を (スタイル, 文字列) の列に平坦化する。文字列中の § 書式コードもスタイルに変換する */
-        fun runs(component: Component): List<Run> {
-            val out = mutableListOf<Run>()
+        fun runs(component: Component): List<Span<Style>> {
+            val out = mutableListOf<Span<Style>>()
             component.visit<Unit>({ style, contents ->
                 var cur = style
                 val sb = StringBuilder()
@@ -150,7 +158,7 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
                     val c = contents[k]
                     val format = if (c == '§' && k + 1 < contents.length) ChatFormatting.getByCode(contents[k + 1]) else null
                     if (format != null) {
-                        if (sb.isNotEmpty()) { out += Run(cur, sb.toString()); sb.clear() }
+                        if (sb.isNotEmpty()) { out += Span(cur, sb.toString()); sb.clear() }
                         cur = if (format == ChatFormatting.RESET) style else cur.applyLegacyFormat(format)
                         k += 2
                         continue
@@ -158,11 +166,10 @@ class TooltipHandler(private val translator: Translator, private val showOrigina
                     sb.append(c)
                     k++
                 }
-                if (sb.isNotEmpty()) out += Run(cur, sb.toString())
+                if (sb.isNotEmpty()) out += Span(cur, sb.toString())
                 Optional.empty()
             }, Style.EMPTY)
             return out
         }
-
     }
 }

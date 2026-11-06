@@ -131,4 +131,40 @@ class ProvidersTest {
         assertEquals("zh-CN", c.body["target"].asString)
         assertEquals("text", c.body["format"].asString)
     }
+
+    // ツールチップの色の区間は <s1>…</s1> のタグで渡す。タグ付きの文のときだけ、エンジンにタグを残させる
+    private val tagged = "Teleport <s1>8 blocks</s1> ahead"
+
+    @Test
+    fun llmInstructionsMentionTagsOnlyForTaggedText() = withServer(
+        "/v1/messages",
+        """{"content":[{"type":"text","text":"x"}],"stop_reason":"end_turn"}""",
+    ) { url, c ->
+        val cfg = base.copy(claudeApiKey = "k")
+        ClaudeProvider(url).translate(tagged, cfg)
+        assertTrue(c.body["system"].asString.contains("<s1>"), c.body["system"].asString)
+        ClaudeProvider(url).translate("Hello", cfg)
+        assertFalse(c.body["system"].asString.contains("<s1>"), c.body["system"].asString)
+    }
+
+    @Test
+    fun deeplUsesXmlTagHandlingOnlyForTaggedText() = withServer("/v2/translate", """{"translations":[{"text":"x"}]}""") { url, c ->
+        val cfg = base.copy(deeplApiKey = "k")
+        DeepLProvider(url).translate(tagged, cfg)
+        assertEquals("xml", c.body["tag_handling"].asString)
+        DeepLProvider(url).translate("Hello", cfg)
+        assertFalse(c.body.has("tag_handling"))
+    }
+
+    @Test
+    fun googleUsesHtmlFormatOnlyForTaggedText() = withServer(
+        "/language/translate/v2",
+        """{"data":{"translations":[{"translatedText":"x"}]}}""",
+    ) { url, c ->
+        val cfg = base.copy(googleApiKey = "gkey")
+        GoogleProvider(url).translate(tagged, cfg)
+        assertEquals("html", c.body["format"].asString)
+        GoogleProvider(url).translate("Hello", cfg)
+        assertEquals("text", c.body["format"].asString)
+    }
 }

@@ -25,4 +25,36 @@ class TextWrapTest {
         val lines = wrap("あいうえ。かきくけ", 4)
         assertTrue(lines.none { it.startsWith("。") }, lines.toString())
     }
+
+    @Test
+    fun fitWidthKeepsOriginalLineCountWithinLimit() {
+        // 1 行の原文は、上限までなら 1 行に収める
+        assertEquals(150, TextWrap.fitWidth(textWidth = 150, lines = 1, minWidth = 120, maxWidth = 180))
+        assertEquals(180, TextWrap.fitWidth(textWidth = 400, lines = 1, minWidth = 120, maxWidth = 180))
+        // 2 行の原文は 2 行に収まる幅 (少し余裕を持たせる)。元の幅より狭くはしない
+        assertEquals(165, TextWrap.fitWidth(textWidth = 300, lines = 2, minWidth = 120, maxWidth = 180))
+        assertEquals(120, TextWrap.fitWidth(textWidth = 100, lines = 2, minWidth = 120, maxWidth = 180))
+    }
+
+    @Test
+    fun wrapsStyledSpansKeepingStyles() {
+        val spans = listOf(Span("gray", "前方の"), Span("green", "8ブロック"), Span("gray", "を移動"))
+        assertEquals(
+            listOf(
+                listOf(Span("gray", "前方の"), Span("green", "8ブ")),
+                listOf(Span("green", "ロック"), Span("gray", "を移")),
+                listOf(Span("gray", "動")),
+            ),
+            TextWrap.wrapSpans(spans, 5) { it.length },
+        )
+    }
+
+    @Test
+    fun wrapSpansDropsSpacesAtLineEdges() {
+        val spans = listOf(Span("gray", "Gain "), Span("green", "+50"), Span("gray", " Speed now"))
+        assertEquals(
+            listOf(listOf(Span("gray", "Gain "), Span("green", "+50")), listOf(Span("gray", "Speed now"))),
+            TextWrap.wrapSpans(spans, 9) { it.length },
+        )
+    }
 }

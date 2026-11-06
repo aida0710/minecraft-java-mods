@@ -2,7 +2,7 @@
 title: Chat Translator
 order: 1
 # 公開している最新の版。Release のタグ (chat-translator-v<版>) とダウンロードの行き先に使う
-version: "0.3.1"
+version: "0.3.2"
 icon: /assets/chat-translator/icon.svg
 # 一覧のカードの名前の色 (Minecraft のレアリティの色に合わせる)
 color: "#FF55FF"
@@ -67,10 +67,10 @@ features:
   - image: /assets/chat-translator/tooltip.jpg
     ja:
       title: アイテムの説明も翻訳
-      text: 同じ色で続く行を 1 つの段落にまとめて訳し、元の幅で折り返します。数値の色もそのままです。J を押している間は原文を表示します。
+      text: 文の途中で折り返した行を 1 つの段落にまとめて訳し、元の幅に合わせて折り返します。色の付いた語句は、訳文の対応する語句にも同じ色を付けます。J を押している間は原文を表示します。
     en:
       title: Item tooltips too
-      text: Lines of the same color are translated together as one paragraph and wrapped to the original width, keeping the colors of numbers. Hold J to see the original.
+      text: Lines wrapped mid-sentence are translated together as one paragraph and wrapped to fit the original width. Colored words keep their color in the translation. Hold J to see the original.
   - image: /assets/chat-translator/book.jpg
     ja:
       title: 本も翻訳
